@@ -1,0 +1,19 @@
+import { Router } from 'express';
+import { AuthController } from './auth.controller';
+import { authenticate } from '../../middlewares/auth.middleware';
+import { validateBody } from '../../middlewares/validate.middleware';
+import { registerDto, loginDto, refreshTokenDto, changePasswordDto } from './auth.dto';
+
+const router = Router();
+
+// Public routes
+router.post('/register', validateBody(registerDto), AuthController.register);
+router.post('/login', validateBody(loginDto), AuthController.login);
+router.post('/refresh', validateBody(refreshTokenDto), AuthController.refreshToken);
+
+// Protected routes
+router.post('/logout', authenticate, AuthController.logout);
+router.post('/change-password', authenticate, validateBody(changePasswordDto), AuthController.changePassword);
+router.get('/me', authenticate, AuthController.me);
+
+export default router;
