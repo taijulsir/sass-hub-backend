@@ -53,13 +53,13 @@ export class AuthService {
     // Find user with password
     const user = await User.findByEmail(dto.email);
     if (!user) {
-      throw ApiError.unauthorized('Invalid email or password');
+      throw ApiError.unauthorized('User not found with this email');
     }
 
     // Check password
     const isPasswordValid = await user.comparePassword(dto.password);
     if (!isPasswordValid) {
-      throw ApiError.unauthorized('Invalid email or password');
+      throw ApiError.unauthorized('Wrong password');
     }
 
     // Generate tokens
