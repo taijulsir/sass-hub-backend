@@ -176,6 +176,37 @@ export class AdminService {
     return organization;
   }
 
+  // Create organization
+  static async createOrganization(data: any, adminId: string): Promise<IOrganizationDocument> {
+    const slug = data.name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
+    const organization = await Organization.create({
+      ...data,
+      slug,
+      ownerId: adminId, // Defaulting owner to the creating admin for now
+      status: OrgStatus.ACTIVE,
+      isActive: true,
+    });
+
+    // Create default subscription
+    await Subscription.create({
+      organizationId: organization._id,
+      plan: Plan.FREE,
+      status: 'active',
+      startDate: new Date(),
+    });
+
+    await AuditService.log({
+      organizationId: organization._id.toString(),
+      userId: adminId,
+      action: AuditAction.ORG_CREATED,
+      resource: 'Organization',
+      resourceId: organization._id.toString(),
+      metadata: { byAdmin: true },
+    });
+
+    return organization;
+  }
+
   // Get all users
   static async getUsers(params: { page?: number; limit?: number; search?: string; isActive?: boolean }) {
     const { page, limit, skip } = parsePagination({
@@ -214,6 +245,26 @@ export class AdminService {
         hasPrev: page > 1,
       },
     };
+  }
+
+  // Create user
+  static async createUser(data: any, adminId: string): Promise<IUserDocument> {
+    const user = await User.create({
+      ...data,
+      password: 'DefaultPassword123!', // Admin created users should have a way to reset
+      globalRole: data.globalRole || GlobalRole.USER,
+      isActive: true,
+    });
+
+    await AuditService.log({
+      userId: adminId,
+      action: AuditAction.USER_CREATED,
+      resource: 'User',
+      resourceId: user._id.toString(),
+      metadata: { createdUserId: user._id, byAdmin: true },
+    });
+
+    return user;
   }
 
   // Get dashboard statistics

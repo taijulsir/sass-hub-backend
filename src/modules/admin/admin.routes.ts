@@ -15,6 +15,7 @@ router.get('/dashboard', AdminController.getDashboard);
 
 // Organizations
 router.get('/organizations', AdminController.getOrganizations);
+router.post('/organizations', AdminController.createOrganization);
 router.get('/organizations/:organizationId', AdminController.getOrganizationDetails);
 router.patch(
   '/organizations/:organizationId/status',
@@ -31,6 +32,7 @@ router.delete('/organizations/:organizationId', AdminController.archiveOrganizat
 
 // Users
 router.get('/users', AdminController.getUsers);
+router.post('/users', AdminController.createUser);
 router.patch('/users/:userId', AdminController.updateUser);
 router.delete('/users/:userId', AdminController.archiveUser);
 

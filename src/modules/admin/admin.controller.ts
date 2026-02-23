@@ -113,6 +113,20 @@ export class AdminController {
     }
   }
 
+  // Create organization (Admin)
+  static async createOrganization(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const organization = await AdminService.createOrganization(req.body, req.user!.userId);
+      sendSuccess(res, { organization }, 'Organization created successfully', HttpStatus.CREATED);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Get all users
   static async getUsers(
     req: AuthenticatedRequest,
@@ -137,6 +151,20 @@ export class AdminController {
         result.pagination.limit,
         'Users fetched successfully'
       );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Create user (Admin)
+  static async createUser(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const user = await AdminService.createUser(req.body, req.user!.userId);
+      sendSuccess(res, { user }, 'User created successfully', HttpStatus.CREATED);
     } catch (error) {
       next(error);
     }
