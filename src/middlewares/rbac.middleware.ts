@@ -1,9 +1,46 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest, MembershipContext } from '../types/interfaces';
-import { Permission, OrgRole, RolePermissions } from '../types/enums';
+import { Permission, OrgRole, RolePermissions, ModuleType, ActionType } from '../types/enums';
 import { ApiError } from '../utils/api-error';
 import { Membership } from '../modules/membership/membership.model';
 import { Organization } from '../modules/organization/organization.model';
+import { Role } from '../modules/role/role.model'; // Import Role model
+
+// Load module permissions dynamically
+async function loadModulePermissions(membership: any): Promise<{ module: ModuleType, actions: ActionType[] }[]> {
+  if (membership.customRoleId) {
+    const role = await Role.findById(membership.customRoleId);
+    if (role) {
+      return role.permissions.map((p: any) => ({
+        module: p.module as ModuleType,
+        actions: p.actions as ActionType[],
+      }));
+    }
+  }
+
+  // Fallback map for static roles
+  const staticPermissions: Record<OrgRole, { module: ModuleType, actions: ActionType[] }[]> = {
+    [OrgRole.OWNER]: Object.values(ModuleType).map(mod => ({
+      module: mod,
+      actions: Object.values(ActionType).filter(a => a !== ActionType.MANAGE) // Owners can do everything except maybe manage system root
+    })),
+    [OrgRole.ADMIN]: [
+      { module: ModuleType.USER, actions: [ActionType.READ, ActionType.CREATE, ActionType.UPDATE, ActionType.DELETE] },
+      { module: ModuleType.FINANCE, actions: [ActionType.READ, ActionType.CREATE] },
+      { module: ModuleType.CRM, actions: [ActionType.READ, ActionType.CREATE, ActionType.UPDATE] },
+      { module: ModuleType.AUDIT, actions: [ActionType.READ] },
+      { module: ModuleType.ORGANIZATION, actions: [ActionType.READ, ActionType.UPDATE] },
+    ],
+    [OrgRole.MEMBER]: [
+      { module: ModuleType.USER, actions: [ActionType.READ] },
+      { module: ModuleType.FINANCE, actions: [ActionType.READ] },
+      { module: ModuleType.CRM, actions: [ActionType.READ] },
+      { module: ModuleType.ORGANIZATION, actions: [ActionType.READ] },
+    ]
+  };
+
+  return staticPermissions[membership.role as OrgRole] || [];
+}
 
 // Load membership for the current organization
 export async function loadMembership(
@@ -19,7 +56,9 @@ export async function loadMembership(
     const organizationId = req.params.organizationId || req.body.organizationId || req.query.organizationId;
     
     if (!organizationId) {
-      return next(ApiError.badRequest('Organization ID is required'));
+      // If no organization ID is provided, skip membership check but user must be authenticated
+      // This is valid for global actions like creating an organization
+      return next(); 
     }
 
     // Check if organization exists and is active
@@ -38,41 +77,63 @@ export async function loadMembership(
       return next(ApiError.forbidden('You are not a member of this organization'));
     }
 
+    const modulePermissions = await loadModulePermissions(membership);
+
     // Build membership context with permissions
     const membershipContext: MembershipContext = {
       membershipId: membership._id.toString(),
-      organizationId: organizationId,
-      role: membership.role,
-      permissions: RolePermissions[membership.role] || [],
+      organizationId: organizationId as string,
+      role: membership.role as OrgRole,
+      permissions: RolePermissions[membership.role as OrgRole] || [], // Legacy support
+      modulePermissions: modulePermissions, // New module permissions
     };
 
     req.membership = membershipContext;
     next();
+
   } catch (error) {
     next(error);
   }
 }
 
-// Check if user has specific permission
-export function requirePermission(...requiredPermissions: Permission[]) {
-  return (
-    req: AuthenticatedRequest,
-    _res: Response,
-    next: NextFunction
-  ): void => {
+// Middleware to check for required permission
+export function requirePermission(requiredPermission: Permission) {
+  return (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
     if (!req.membership) {
-      return next(ApiError.forbidden('Membership context not loaded'));
+      return next(ApiError.forbidden('Membership context required'));
     }
 
-    const hasPermission = requiredPermissions.every((permission) =>
-      req.membership!.permissions.includes(permission)
-    );
-
-    if (!hasPermission) {
-      return next(ApiError.forbidden('Insufficient permissions'));
+    if (req.membership.role === OrgRole.OWNER) {
+      return next();
+    }
+    
+    // Check allow legacy permissions
+    if (req.membership.permissions.includes(requiredPermission)) {
+      return next();
     }
 
-    next();
+    return next(ApiError.forbidden('Insufficient permissions'));
+  };
+}
+
+// Middleware to check for module specific permission
+export function requireModulePermission(module: ModuleType, action: ActionType) {
+  return (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
+    if (!req.membership) {
+      return next(ApiError.forbidden('Membership context required'));
+    }
+
+    if (req.membership.role === OrgRole.OWNER) {
+      return next();
+    }
+
+    const permission = req.membership.modulePermissions?.find(p => p.module === module);
+    
+    if (permission && (permission.actions.includes(action) || permission.actions.includes(ActionType.MANAGE))) {
+      return next();
+    }
+
+    return next(ApiError.forbidden(`Insufficient permissions for ${module}`));
   };
 }
 

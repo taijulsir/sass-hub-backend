@@ -15,6 +15,7 @@ export function createApp(): Application {
   // Security middleware
   app.use(helmet());
   
+  
   // CORS
   app.use(cors({
     origin: env.corsOrigin,

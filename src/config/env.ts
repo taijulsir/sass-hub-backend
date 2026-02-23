@@ -19,6 +19,19 @@ export const env = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
   
+  // Frontend
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+
+  // Email
+  email: {
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+    from: process.env.EMAIL_FROM || 'noreply@example.com',
+  },
+  
   // CORS
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   
