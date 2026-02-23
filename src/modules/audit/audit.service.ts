@@ -63,7 +63,11 @@ export class AuditService {
     }
 
     if (params.action) {
-      filter.action = params.action;
+      if (typeof params.action === "string" && params.action.includes(",")) {
+        filter.action = { $in: params.action.split(",") };
+      } else {
+        filter.action = params.action;
+      }
     }
 
     if (params.resource) {

@@ -325,11 +325,13 @@ export class AdminService {
   }
 
   // Get audit logs
-  static async getAuditLogs(params: { page?: number; limit?: number }) {
+  static async getAuditLogs(params: { page?: number; limit?: number; action?: any; search?: string; resource?: string }) {
     // Admin sees all logs (no organization filter)
     return AuditService.getLogs({
       page: params.page,
       limit: params.limit,
+      action: params.action,
+      resource: params.resource || params.search,
     });
   }
 

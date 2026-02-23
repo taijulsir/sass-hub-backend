@@ -205,10 +205,13 @@ export class AdminController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { page, limit } = req.query as Record<string, string>;
+      const { page, limit, action, search, resource } = req.query as Record<string, string>;
       const result = await AdminService.getAuditLogs({
         page: page ? parseInt(page) : undefined,
         limit: limit ? parseInt(limit) : undefined,
+        action,
+        search,
+        resource,
       });
       sendPaginated(
         res,
