@@ -108,4 +108,24 @@ export class AuthController {
       next(error);
     }
   }
+
+  // Forgot password
+  static async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      await AuthService.forgotPassword(req.body);
+      sendSuccess(res, null, 'If an account with that email exists, a password reset link has been sent.');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Reset password
+  static async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      await AuthService.resetPassword(req.body);
+      sendSuccess(res, null, 'Password has been reset successfully.');
+    } catch (error) {
+      next(error);
+    }
+  }
 }

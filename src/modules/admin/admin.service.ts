@@ -267,4 +267,71 @@ export class AdminService {
   static async getSuperAdmins(): Promise<IUserDocument[]> {
     return User.find({ globalRole: GlobalRole.SUPER_ADMIN });
   }
+
+  // Get audit logs
+  static async getAuditLogs(params: { page?: number; limit?: number }) {
+    // Admin sees all logs (no organization filter)
+    return AuditService.getLogs({
+      page: params.page,
+      limit: params.limit,
+    });
+  }
+
+  // Get analytics
+  static async getAnalytics(params: { startDate?: Date; endDate?: Date }) {
+    const start = params.startDate || new Date(new Date().setMonth(new Date().getMonth() - 1));
+    const end = params.endDate || new Date();
+
+    // Example aggregations
+    // 1. User growth
+    const userGrowth = await User.aggregate([
+      { $match: { createdAt: { $gte: start, $lte: end } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // 2. Organization growth
+    const orgGrowth = await Organization.aggregate([
+      { $match: { createdAt: { $gte: start, $lte: end } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    // 3. Revenue simplified (from subscriptions)
+    const activeSubscriptions = await Subscription.countDocuments({ status: 'active' });
+
+    return {
+      userGrowth,
+      orgGrowth,
+      activeSubscriptions,
+      period: { start, end }
+    };
+  }
+
+  // Get system settings (Mocked for now)
+  static async getSettings() {
+    // In a real app, fetch from a Settings model
+    return {
+      registrationEnabled: true,
+      maintenanceMode: false,
+      defaultTrialDays: 14,
+      supportEmail: 'support@example.com'
+    };
+  }
+
+  // Update system settings (Mocked)
+  static async updateSettings(settings: any) {
+    // In a real app, update Settings model
+    return settings;
+  }
 }

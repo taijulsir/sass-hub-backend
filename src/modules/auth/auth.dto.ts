@@ -55,3 +55,28 @@ export const changePasswordDto = z.object({
 });
 
 export type ChangePasswordDto = z.infer<typeof changePasswordDto>;
+
+// Forgot password DTO
+export const forgotPasswordDto = z.object({
+  email: z
+    .string()
+    .email('Invalid email address')
+    .toLowerCase()
+    .trim(),
+});
+
+export type ForgotPasswordDto = z.infer<typeof forgotPasswordDto>;
+
+// Reset password DTO
+export const resetPasswordDto = z.object({
+  token: z.string().min(1, 'Token is required'),
+  newPassword: z
+    .string()
+    .min(8, 'New password must be at least 8 characters')
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+      'New password must contain at least one uppercase letter, one lowercase letter, and one number'
+    ),
+});
+
+export type ResetPasswordDto = z.infer<typeof resetPasswordDto>;

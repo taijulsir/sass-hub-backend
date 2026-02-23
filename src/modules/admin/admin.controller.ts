@@ -153,4 +153,68 @@ export class AdminController {
       next(error);
     }
   }
+
+  // Get audit logs
+  static async getAuditLogs(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { page, limit } = req.query as Record<string, string>;
+      const logs = await AdminService.getAuditLogs({
+        page: page ? parseInt(page) : undefined,
+        limit: limit ? parseInt(limit) : undefined,
+      });
+      sendSuccess(res, logs);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get analytics
+  static async getAnalytics(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { startDate, endDate } = req.query as Record<string, string>;
+      const analytics = await AdminService.getAnalytics({
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined,
+      });
+      sendSuccess(res, { analytics });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get settings
+  static async getSettings(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const settings = await AdminService.getSettings();
+      sendSuccess(res, { settings });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Update settings
+  static async updateSettings(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const settings = await AdminService.updateSettings(req.body);
+      sendSuccess(res, { settings }, 'Settings updated');
+    } catch (error) {
+      next(error);
+    }
+  }
 }

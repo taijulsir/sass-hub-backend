@@ -34,4 +34,14 @@ router.get('/users', AdminController.getUsers);
 router.get('/plans', AdminController.getPlans);
 router.post('/plans', validateBody(createPlanDto), AdminController.createPlan);
 
+// Audit Logs
+router.get('/audit-logs', AdminController.getAuditLogs);
+
+// Analytics
+router.get('/analytics', AdminController.getAnalytics);
+
+// Settings
+router.get('/settings', AdminController.getSettings);
+router.put('/settings', AdminController.updateSettings);
+
 export default router;
