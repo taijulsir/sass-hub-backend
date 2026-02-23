@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AdminService } from './admin.service';
 import { AuthenticatedRequest } from '../../types/interfaces';
-import { sendSuccess } from '../../utils/response';
+import { sendSuccess, sendPaginated } from '../../utils/response';
 import { HttpStatus } from '../../utils/api-error';
 import { OrgStatus, Plan } from '../../types/enums';
 
@@ -38,7 +38,14 @@ export class AdminController {
         isActive: isActive !== undefined ? isActive === 'true' : true,
       });
 
-      sendSuccess(res, result);
+      sendPaginated(
+        res,
+        result.data,
+        result.pagination.total,
+        result.pagination.page,
+        result.pagination.limit,
+        'Organizations fetched successfully'
+      );
     } catch (error) {
       next(error);
     }
@@ -122,7 +129,14 @@ export class AdminController {
         isActive: isActive !== undefined ? isActive === 'true' : true,
       });
 
-      sendSuccess(res, result);
+      sendPaginated(
+        res,
+        result.data,
+        result.pagination.total,
+        result.pagination.page,
+        result.pagination.limit,
+        'Users fetched successfully'
+      );
     } catch (error) {
       next(error);
     }
@@ -164,11 +178,18 @@ export class AdminController {
   ): Promise<void> {
     try {
       const { page, limit } = req.query as Record<string, string>;
-      const logs = await AdminService.getAuditLogs({
+      const result = await AdminService.getAuditLogs({
         page: page ? parseInt(page) : undefined,
         limit: limit ? parseInt(limit) : undefined,
       });
-      sendSuccess(res, logs);
+      sendPaginated(
+        res,
+        result.data,
+        result.pagination.total,
+        result.pagination.page,
+        result.pagination.limit,
+        'Audit logs fetched successfully'
+      );
     } catch (error) {
       next(error);
     }
