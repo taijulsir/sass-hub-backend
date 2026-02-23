@@ -43,6 +43,10 @@ const organizationSchema = new Schema<IOrganizationDocument>(
       type: Schema.Types.Mixed,
       default: {},
     },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   {
     timestamps: true,

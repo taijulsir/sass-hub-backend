@@ -87,6 +87,7 @@ export interface IUser {
   resetPasswordExpires?: Date;
   googleId?: string;
   avatar?: string;
+  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -101,6 +102,7 @@ export interface IOrganization {
   plan: string;
   status: string;
   settings?: Record<string, unknown>;
+  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
