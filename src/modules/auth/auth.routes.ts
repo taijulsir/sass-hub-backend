@@ -9,7 +9,7 @@ const router = Router();
 // Public routes
 router.post('/register', validateBody(registerDto), AuthController.register);
 router.post('/login', validateBody(loginDto), AuthController.login);
-router.post('/refresh', validateBody(refreshTokenDto), AuthController.refreshToken);
+router.post('/refresh-token', validateBody(refreshTokenDto), AuthController.refreshToken);
 router.post('/forgot-password', validateBody(forgotPasswordDto), AuthController.forgotPassword);
 router.post('/reset-password', validateBody(resetPasswordDto), AuthController.resetPassword);
 

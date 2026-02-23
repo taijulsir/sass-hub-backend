@@ -308,7 +308,7 @@ export class AdminService {
     ]);
 
     // 3. Revenue simplified (from subscriptions)
-    const activeSubscriptions = await Subscription.countDocuments({ status: 'active' });
+    const activeSubscriptions = await Subscription.countDocuments({ isActive: true });
 
     return {
       userGrowth,
