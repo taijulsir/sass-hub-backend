@@ -27,7 +27,7 @@ export class AdminController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { status, plan, search, page, limit } = req.query as Record<string, string>;
+      const { status, plan, search, page, limit, isActive } = req.query as Record<string, string>;
 
       const result = await AdminService.getOrganizations({
         status: status as OrgStatus,
@@ -35,6 +35,7 @@ export class AdminController {
         search,
         page: page ? parseInt(page) : undefined,
         limit: limit ? parseInt(limit) : undefined,
+        isActive: isActive !== undefined ? isActive === 'true' : true,
       });
 
       sendSuccess(res, result);
@@ -112,12 +113,13 @@ export class AdminController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { search, page, limit } = req.query as Record<string, string>;
+      const { search, page, limit, isActive } = req.query as Record<string, string>;
 
       const result = await AdminService.getUsers({
         search,
         page: page ? parseInt(page) : undefined,
         limit: limit ? parseInt(limit) : undefined,
+        isActive: isActive !== undefined ? isActive === 'true' : true,
       });
 
       sendSuccess(res, result);
@@ -213,6 +215,103 @@ export class AdminController {
     try {
       const settings = await AdminService.updateSettings(req.body);
       sendSuccess(res, { settings }, 'Settings updated');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Archive organization
+  static async archiveOrganization(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { organizationId } = req.params;
+      const organization = await AdminService.archiveOrganization(
+        organizationId,
+        req.user!.userId
+      );
+
+      sendSuccess(res, { organization }, 'Organization archived successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Archive user
+  static async archiveUser(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const user = await AdminService.archiveUser(
+        userId,
+        req.user!.userId
+      );
+
+      sendSuccess(res, { user }, 'User archived successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Archive subscription
+  static async archiveSubscription(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { subscriptionId } = req.params;
+      await AdminService.archiveSubscription(
+        subscriptionId,
+        req.user!.userId
+      );
+
+      sendSuccess(res, null, 'Subscription archived successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Update organization
+  static async updateOrganization(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { organizationId } = req.params;
+      const organization = await AdminService.updateOrganization(
+        organizationId,
+        req.body,
+        req.user!.userId
+      );
+
+      sendSuccess(res, { organization }, 'Organization updated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Update user
+  static async updateUser(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const user = await AdminService.updateUser(
+        userId,
+        req.body,
+        req.user!.userId
+      );
+
+      sendSuccess(res, { user }, 'User updated successfully');
     } catch (error) {
       next(error);
     }

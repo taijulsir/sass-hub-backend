@@ -15,7 +15,7 @@ export function createApp(): Application {
   // Security middleware
   app.use(helmet());
   
-  
+
   // CORS
   app.use(cors({
     origin: env.corsOrigin,
@@ -34,6 +34,7 @@ export function createApp(): Application {
     },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: () => env.nodeEnv === 'development', // Skip rate limiting in development
   });
   app.use(limiter);
 

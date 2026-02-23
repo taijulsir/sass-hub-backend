@@ -26,9 +26,13 @@ router.patch(
   validateBody(adminChangeOrgPlanDto),
   AdminController.changeOrgPlan
 );
+router.patch('/organizations/:organizationId', AdminController.updateOrganization);
+router.delete('/organizations/:organizationId', AdminController.archiveOrganization);
 
 // Users
 router.get('/users', AdminController.getUsers);
+router.patch('/users/:userId', AdminController.updateUser);
+router.delete('/users/:userId', AdminController.archiveUser);
 
 // Plans
 router.get('/plans', AdminController.getPlans);

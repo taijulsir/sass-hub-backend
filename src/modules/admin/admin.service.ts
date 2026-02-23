@@ -17,6 +17,7 @@ export interface AdminOrgQueryParams {
   search?: string;
   page?: number;
   limit?: number;
+  isActive?: boolean;
 }
 
 export class AdminService {
@@ -30,7 +31,9 @@ export class AdminService {
     });
 
     // Build filter
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = {
+      isActive: params.isActive !== undefined ? params.isActive : true,
+    };
 
     if (params.status) {
       filter.status = params.status;
@@ -174,13 +177,15 @@ export class AdminService {
   }
 
   // Get all users
-  static async getUsers(params: { page?: number; limit?: number; search?: string }) {
+  static async getUsers(params: { page?: number; limit?: number; search?: string; isActive?: boolean }) {
     const { page, limit, skip } = parsePagination({
       page: params.page?.toString(),
       limit: params.limit?.toString(),
     });
 
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = {
+      isActive: params.isActive !== undefined ? params.isActive : true,
+    };
 
     if (params.search) {
       filter.$or = [
@@ -222,13 +227,13 @@ export class AdminService {
       proOrgs,
       enterpriseOrgs,
     ] = await Promise.all([
-      Organization.countDocuments(),
-      Organization.countDocuments({ status: OrgStatus.ACTIVE }),
-      Organization.countDocuments({ status: OrgStatus.SUSPENDED }),
-      User.countDocuments(),
-      Organization.countDocuments({ plan: Plan.FREE }),
-      Organization.countDocuments({ plan: Plan.PRO }),
-      Organization.countDocuments({ plan: Plan.ENTERPRISE }),
+      Organization.countDocuments({ isActive: true }),
+      Organization.countDocuments({ status: OrgStatus.ACTIVE, isActive: true }),
+      Organization.countDocuments({ status: OrgStatus.SUSPENDED, isActive: true }),
+      User.countDocuments({ isActive: true }),
+      Organization.countDocuments({ plan: Plan.FREE, isActive: true }),
+      Organization.countDocuments({ plan: Plan.PRO, isActive: true }),
+      Organization.countDocuments({ plan: Plan.ENTERPRISE, isActive: true }),
     ]);
 
     return {
@@ -285,7 +290,7 @@ export class AdminService {
     // Example aggregations
     // 1. User growth
     const userGrowth = await User.aggregate([
-      { $match: { createdAt: { $gte: start, $lte: end } } },
+      { $match: { createdAt: { $gte: start, $lte: end }, isActive: true } },
       {
         $group: {
           _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
@@ -297,7 +302,7 @@ export class AdminService {
 
     // 2. Organization growth
     const orgGrowth = await Organization.aggregate([
-      { $match: { createdAt: { $gte: start, $lte: end } } },
+      { $match: { createdAt: { $gte: start, $lte: end }, isActive: true } },
       {
         $group: {
           _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
@@ -333,5 +338,128 @@ export class AdminService {
   static async updateSettings(settings: any) {
     // In a real app, update Settings model
     return settings;
+  }
+
+  // Archive organization (soft delete)
+  static async archiveOrganization(organizationId: string, adminId: string): Promise<IOrganizationDocument> {
+    const organization = await Organization.findById(organizationId);
+    if (!organization) {
+      throw ApiError.notFound('Organization not found');
+    }
+
+    organization.isActive = false;
+    await organization.save();
+
+    // Audit log
+    await AuditService.log({
+      organizationId,
+      userId: adminId,
+      action: AuditAction.ORG_DELETED, // Reusing existing action for soft delete
+      resource: 'Organization',
+      resourceId: organizationId,
+      metadata: { archived: true, byAdmin: true },
+    });
+
+    return organization;
+  }
+
+  // Archive user (soft delete)
+  static async archiveUser(userId: string, adminId: string): Promise<IUserDocument> {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw ApiError.notFound('User not found');
+    }
+
+    user.isActive = false;
+    await user.save();
+
+    // Audit log
+    await AuditService.log({
+      userId: adminId,
+      action: AuditAction.USER_DELETED, // Reusing existing action for soft delete
+      resource: 'User',
+      resourceId: userId,
+      metadata: { archived: true, byAdmin: true },
+    });
+
+    return user;
+  }
+
+  // Archive subscription
+  static async archiveSubscription(subscriptionId: string, adminId: string): Promise<void> {
+    const subscription = await Subscription.findById(subscriptionId);
+    if (!subscription) {
+      throw ApiError.notFound('Subscription not found');
+    }
+
+    subscription.isActive = false;
+    await subscription.save();
+
+    // Audit log
+    await AuditService.log({
+      organizationId: subscription.organizationId.toString(),
+      userId: adminId,
+      action: AuditAction.PLAN_CHANGED, // Or define a new one if needed
+      resource: 'Subscription',
+      resourceId: subscriptionId,
+      metadata: { archived: true, byAdmin: true },
+    });
+  }
+
+  // Update organization details
+  static async updateOrganization(
+    organizationId: string,
+    data: { name?: string; status?: OrgStatus; plan?: Plan },
+    adminId: string
+  ): Promise<IOrganizationDocument> {
+    const organization = await Organization.findById(organizationId);
+    if (!organization) {
+      throw ApiError.notFound('Organization not found');
+    }
+
+    if (data.name) organization.name = data.name;
+    if (data.status) organization.status = data.status;
+    if (data.plan) organization.plan = data.plan;
+
+    await organization.save();
+
+    // Audit log
+    await AuditService.log({
+      organizationId,
+      userId: adminId,
+      action: AuditAction.ORG_UPDATED,
+      resource: 'Organization',
+      resourceId: organizationId,
+      metadata: { ...data, byAdmin: true },
+    });
+
+    return organization;
+  }
+
+  // Update user details
+  static async updateUser(
+    userId: string,
+    data: { name?: string },
+    adminId: string
+  ): Promise<IUserDocument> {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw ApiError.notFound('User not found');
+    }
+
+    if (data.name) user.name = data.name;
+
+    await user.save();
+
+    // Audit log
+    await AuditService.log({
+      userId: adminId,
+      action: AuditAction.USER_UPDATED,
+      resource: 'User',
+      resourceId: userId,
+      metadata: { ...data, byAdmin: true },
+    });
+
+    return user;
   }
 }
