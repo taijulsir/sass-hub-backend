@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { AuthController } from './auth.controller';
 import { authenticate } from '../../middlewares/auth.middleware';
 import { validateBody } from '../../middlewares/validate.middleware';
-import { registerDto, loginDto, refreshTokenDto, changePasswordDto } from './auth.dto';
+import { registerDto, loginDto, refreshTokenDto, changePasswordDto, forgotPasswordDto, resetPasswordDto } from './auth.dto';
 
 const router = Router();
 
@@ -10,6 +10,8 @@ const router = Router();
 router.post('/register', validateBody(registerDto), AuthController.register);
 router.post('/login', validateBody(loginDto), AuthController.login);
 router.post('/refresh', validateBody(refreshTokenDto), AuthController.refreshToken);
+router.post('/forgot-password', validateBody(forgotPasswordDto), AuthController.forgotPassword);
+router.post('/reset-password', validateBody(resetPasswordDto), AuthController.resetPassword);
 
 // Protected routes
 router.post('/logout', authenticate, AuthController.logout);

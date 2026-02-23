@@ -5,6 +5,7 @@ import { OrgRole } from '../../types/enums';
 export const createInvitationDto = z.object({
   email: z.string().email('Invalid email address').toLowerCase().trim(),
   role: z.nativeEnum(OrgRole).default(OrgRole.MEMBER),
+  customRoleId: z.string().optional(),
 });
 
 export type CreateInvitationDto = z.infer<typeof createInvitationDto>;

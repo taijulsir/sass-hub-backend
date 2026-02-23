@@ -5,6 +5,9 @@ import { ApiError } from '../../utils/api-error';
 import { OrgRole, InvitationStatus, AuditAction } from '../../types/enums';
 import { CreateInvitationDto } from './invitation.dto';
 import { AuditService } from '../audit/audit.service';
+import { Role } from '../role/role.model';
+import { EmailService } from '../email/email.service';
+import { Organization } from '../organization/organization.model';
 
 export class InvitationService {
   // Create invitation
@@ -40,6 +43,18 @@ export class InvitationService {
       throw ApiError.badRequest('Cannot invite as owner');
     }
 
+    // Validate custom role if provided
+    if (dto.customRoleId) {
+      const customRole = await Role.findOne({
+        _id: dto.customRoleId,
+        organizationId,
+      });
+
+      if (!customRole) {
+        throw ApiError.badRequest('Custom role not found');
+      }
+    }
+
     // Create invitation
     const invitation = await Invitation.create({
       email: dto.email,
@@ -47,7 +62,27 @@ export class InvitationService {
       role: dto.role,
       invitedBy,
       status: InvitationStatus.PENDING,
+      customRoleId: dto.customRoleId,
     });
+
+    // Send invitation email
+    try {
+      const inviter = await User.findById(invitedBy);
+      const organization = await Organization.findById(organizationId);
+
+      if (inviter && organization) {
+        await EmailService.sendInvitation(
+          dto.email,
+          invitation.token,
+          inviter.name,
+          organization.name
+        );
+      }
+    } catch (error) {
+      // Log error but continue
+      // Use standard logger if potential available, or console
+      console.error('Failed to send invitation email:', error);
+    }
 
     // Audit log
     await AuditService.log({
@@ -116,6 +151,7 @@ export class InvitationService {
       userId,
       organizationId: invitation.organizationId,
       role: invitation.role,
+      customRoleId: invitation.customRoleId,
     });
 
     // Update invitation

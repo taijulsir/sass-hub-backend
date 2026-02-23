@@ -24,6 +24,10 @@ const invitationSchema = new Schema<IInvitationDocument>(
       enum: Object.values(OrgRole),
       default: OrgRole.MEMBER,
     },
+    customRoleId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Role',
+    },
     status: {
       type: String,
       enum: Object.values(InvitationStatus),
