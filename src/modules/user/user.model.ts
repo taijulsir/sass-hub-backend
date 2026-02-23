@@ -54,6 +54,12 @@ const userSchema = new Schema<IUserDocument>(
     avatar: {
       type: String,
     },
+    resetPasswordToken: {
+      type: String,
+    },
+    resetPasswordExpires: {
+      type: Date,
+    },
   },
   {
     timestamps: true,

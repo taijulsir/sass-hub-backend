@@ -6,9 +6,29 @@ export enum GlobalRole {
 
 // Organization Roles - Within an organization
 export enum OrgRole {
-  OWNER = 'OWNER',
-  ADMIN = 'ADMIN',
-  MEMBER = 'MEMBER',
+  OWNER = 'OWNER', // Full access
+  ADMIN = 'ADMIN', // Configurable access
+  MEMBER = 'MEMBER', // Limited access
+}
+
+// Modules available in the system
+export enum ModuleType {
+  USER = 'USER',
+  FINANCE = 'FINANCE',
+  CRM = 'CRM',
+  AUDIT = 'AUDIT',
+  SUBSCRIPTION = 'SUBSCRIPTION',
+  ORGANIZATION = 'ORGANIZATION',
+  ROLE = 'ROLE', // To manage roles themselves
+}
+
+// Actions that can be performed on modules
+export enum ActionType {
+  CREATE = 'CREATE',
+  READ = 'READ',
+  UPDATE = 'UPDATE',
+  DELETE = 'DELETE',
+  MANAGE = 'MANAGE', // Typically includes all actions + specific admin tasks
 }
 
 // Permissions for RBAC
@@ -107,6 +127,8 @@ export enum AuditAction {
   USER_LOGIN = 'USER_LOGIN',
   USER_LOGOUT = 'USER_LOGOUT',
   PASSWORD_CHANGED = 'PASSWORD_CHANGED',
+  PASSWORD_RESET_REQUESTED = 'PASSWORD_RESET_REQUESTED',
+  PASSWORD_RESET_COMPLETED = 'PASSWORD_RESET_COMPLETED',
   
   // Organization actions
   ORG_CREATED = 'ORG_CREATED',

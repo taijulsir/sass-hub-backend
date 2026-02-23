@@ -21,6 +21,10 @@ const membershipSchema = new Schema<IMembershipDocument>(
       enum: Object.values(OrgRole),
       default: OrgRole.MEMBER,
     },
+    customRoleId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Role',
+    },
     joinedAt: {
       type: Date,
       default: Date.now,

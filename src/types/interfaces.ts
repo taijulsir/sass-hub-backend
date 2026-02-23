@@ -21,6 +21,7 @@ export interface MembershipContext {
   organizationId: string;
   role: OrgRole;
   permissions: Permission[];
+  modulePermissions?: { module: string, actions: string[] }[];
 }
 
 // Token pair response
@@ -82,6 +83,8 @@ export interface IUser {
   globalRole: GlobalRole;
   isEmailVerified: boolean;
   refreshToken?: string;
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
   googleId?: string;
   avatar?: string;
   createdAt: Date;
@@ -108,6 +111,7 @@ export interface IMembership {
   userId: Types.ObjectId;
   organizationId: Types.ObjectId;
   role: OrgRole;
+  customRoleId?: Types.ObjectId;
   joinedAt: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -119,6 +123,7 @@ export interface IInvitation {
   email: string;
   organizationId: Types.ObjectId;
   role: OrgRole;
+  customRoleId?: string;
   status: string;
   invitedBy: Types.ObjectId;
   token: string;
