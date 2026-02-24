@@ -20,7 +20,7 @@ export const env = {
   },
   
   // Frontend
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+  adminFrontendUrl: process.env.ADMIN_FRONTEND_URL || 'http://localhost:3000',
 
   // Email
   email: {
@@ -46,6 +46,22 @@ export const env = {
     clientId: process.env.GOOGLE_CLIENT_ID || '',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
     callbackUrl: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/api/auth/google/callback',
+  },
+
+  // DO Spaces
+  DO_ACCESS_KEY_ID: process.env.DO_ACCESS_KEY_ID || '',
+  DO_ACCESS_SECRET_KEY: process.env.DO_ACCESS_SECRET_KEY || '',
+  DO_BUCKET_NAME: process.env.DO_BUCKET_NAME || 'sass-hub-assets',
+  DO_REGION: process.env.DO_REGION || 'nyc3',
+  DO_ENDPOINT: process.env.DO_ENDPOINT || 'https://nyc3.digitaloceanspaces.com',
+
+  // Resend
+  RESEND_API_KEY: process.env.RESEND_API_KEY || '',
+
+  // Redis
+  redis: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT || '6379', 10),
   },
   
   // Helper methods

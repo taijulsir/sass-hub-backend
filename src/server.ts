@@ -3,6 +3,9 @@ import { env, validateEnv } from './config/env';
 import { connectDatabase } from './config/db';
 import { logger } from './config/logger';
 
+// Initialize email worker
+import './modules/mail/mail.worker';
+
 async function bootstrap(): Promise<void> {
   try {
     // Validate environment variables

@@ -27,7 +27,7 @@ export class EmailService {
   }
 
   static async sendInvitation(email: string, token: string, inviterName: string, organizationName: string) {
-    const inviteUrl = `${env.frontendUrl}/accept-invite?token=${token}`;
+    const inviteUrl = `${env.adminFrontendUrl}/accept-invite?token=${token}`;
     
     const mailOptions = {
         from: `"${organizationName}" <${env.email.from}>`,
