@@ -1,7 +1,30 @@
 // Global Roles - Platform level roles
 export enum GlobalRole {
   SUPER_ADMIN = 'SUPER_ADMIN',
+  ADMIN = 'ADMIN',
   USER = 'USER',
+  MEMBER = 'MEMBER',
+  SUPPORT = 'SUPPORT',
+}
+
+// Admin panel modules (used for designation-based permissions)
+export enum AdminModule {
+  DASHBOARD = 'DASHBOARD',
+  ORGANIZATIONS = 'ORGANIZATIONS',
+  SUBSCRIPTIONS = 'SUBSCRIPTIONS',
+  USERS = 'USERS',
+  DESIGNATIONS = 'DESIGNATIONS',
+  AUDIT = 'AUDIT',
+  ANALYTICS = 'ANALYTICS',
+  SETTINGS = 'SETTINGS',
+}
+
+// Per-module actions an admin user can be granted
+export enum AdminAction {
+  VIEW = 'VIEW',
+  CREATE = 'CREATE',
+  EDIT = 'EDIT',
+  ARCHIVE = 'ARCHIVE',
 }
 
 // Organization Roles - Within an organization

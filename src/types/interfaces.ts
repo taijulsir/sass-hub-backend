@@ -88,6 +88,16 @@ export interface IUser {
   googleId?: string;
   avatar?: string;
   isActive: boolean;
+  
+  // Suspense details
+  status?: string; // e.g. 'active', 'suspended'
+  suspenseNote?: string;
+  suspensedAt?: Date;
+  suspensedBy?: Types.ObjectId;
+
+  // Designation-based admin permissions
+  designationId?: Types.ObjectId | null;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -129,6 +139,7 @@ export interface IInvitation {
   customRoleId?: string;
   status: string;
   invitedBy: Types.ObjectId;
+  avatar?: string;
   token: string;
   expiresAt: Date;
   acceptedAt?: Date;
