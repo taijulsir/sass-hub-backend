@@ -11,6 +11,7 @@ import { crmRoutes } from './modules/crm';
 import { financeRoutes } from './modules/finance';
 import { auditRoutes } from './modules/audit';
 import { adminRoutes } from './modules/admin';
+import uploadRoutes from './modules/upload/upload.routes';
 
 const router = Router();
 
@@ -34,5 +35,6 @@ router.use('/crm', crmRoutes);
 router.use('/finance', financeRoutes);
 router.use('/audit', auditRoutes);
 router.use('/admin', adminRoutes);
+router.use('/upload', uploadRoutes);
 
 export default router;
