@@ -309,7 +309,6 @@ export class AdminService {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate('roleId', 'name')
       .lean();
 
     const totalPages = Math.ceil(total / limit);
