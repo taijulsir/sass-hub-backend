@@ -6,7 +6,7 @@ export interface IModulePermission {
   actions: AdminAction[];
 }
 
-export interface IDesignation {
+export interface IAdminRole {
   name: string;
   description?: string;
   permissions: IModulePermission[];
@@ -15,8 +15,8 @@ export interface IDesignation {
   updatedAt?: Date;
 }
 
-export interface IDesignationDocument extends Omit<IDesignation, '_id'>, Document {}
-export interface IDesignationModel extends Model<IDesignationDocument> {}
+export interface IAdminRoleDocument extends Omit<IAdminRole, '_id'>, Document {}
+export interface IAdminRoleModel extends Model<IAdminRoleDocument> {}
 
 const modulePermissionSchema = new Schema<IModulePermission>(
   {
@@ -35,11 +35,11 @@ const modulePermissionSchema = new Schema<IModulePermission>(
   { _id: false }
 );
 
-const designationSchema = new Schema<IDesignationDocument>(
+const adminRoleSchema = new Schema<IAdminRoleDocument>(
   {
     name: {
       type: String,
-      required: [true, 'Designation name is required'],
+      required: [true, 'Role name is required'],
       trim: true,
       unique: true,
       maxlength: [80, 'Name must be under 80 characters'],
@@ -57,13 +57,20 @@ const designationSchema = new Schema<IDesignationDocument>(
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true, transform: (_doc, ret: Record<string, unknown>) => { delete ret.__v; return ret; } },
+    toJSON: {
+      virtuals: true,
+      transform: (_doc, ret: Record<string, unknown>) => {
+        delete ret.__v;
+        return ret;
+      },
+    },
   }
 );
 
-designationSchema.index({ name: 1 });
+adminRoleSchema.index({ name: 1 });
 
-export const Designation = mongoose.model<IDesignationDocument, IDesignationModel>(
+// Uses the 'Designation' collection name to preserve existing MongoDB data
+export const AdminRole = mongoose.model<IAdminRoleDocument, IAdminRoleModel>(
   'Designation',
-  designationSchema
+  adminRoleSchema
 );

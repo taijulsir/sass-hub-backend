@@ -309,7 +309,7 @@ export class AdminService {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate('designationId', 'name')
+      .populate('roleId', 'name')
       .lean();
 
     const totalPages = Math.ceil(total / limit);
@@ -479,18 +479,18 @@ export class AdminService {
     return user;
   }
 
-  // Assign designation to a user
-  static async assignDesignation(userId: string, designationId: string | null, adminId: string) {
+  // Assign admin role to a user
+  static async assignRole(userId: string, roleId: string | null, adminId: string) {
     const user = await User.findById(userId);
     if (!user) throw ApiError.notFound('User not found');
 
-    if (designationId) {
-      const { Designation } = await import('../designation/designation.model');
-      const designation = await Designation.findById(designationId);
-      if (!designation || !designation.isActive) throw ApiError.notFound('Designation not found');
+    if (roleId) {
+      const { AdminRole } = await import('../admin-role/admin-role.model');
+      const role = await AdminRole.findById(roleId);
+      if (!role || !role.isActive) throw ApiError.notFound('Role not found');
     }
 
-    user.designationId = designationId ? new Types.ObjectId(designationId) : null;
+    user.roleId = roleId ? new Types.ObjectId(roleId) : null;
     await user.save();
 
     await AuditService.log({
@@ -498,10 +498,10 @@ export class AdminService {
       action: AuditAction.USER_UPDATED,
       resource: 'User',
       resourceId: userId,
-      metadata: { designationAssigned: designationId, byAdmin: true },
+      metadata: { roleAssigned: roleId, byAdmin: true },
     });
 
-    return User.findById(userId).populate('designationId', 'name permissions');
+    return User.findById(userId).populate('roleId', 'name permissions');
   }
 
   // Get dashboard statistics

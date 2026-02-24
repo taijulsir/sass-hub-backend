@@ -78,7 +78,7 @@ const userSchema = new Schema<IUserDocument>(
       type: Schema.Types.ObjectId,
       ref: 'User',
     },
-    designationId: {
+    roleId: {
       type: Schema.Types.ObjectId,
       ref: 'Designation',
       default: null,

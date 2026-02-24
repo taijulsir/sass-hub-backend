@@ -5,7 +5,7 @@ import { validateBody } from '../../middlewares/validate.middleware';
 import { adminChangeOrgStatusDto, adminChangeOrgPlanDto, createPlanDto } from './admin.dto';
 import { checkPlatformPermission } from '../platform-rbac/platform-rbac.middleware';
 import { PLATFORM_PERMISSIONS } from '../../constants/platform-permissions';
-import designationRoutes from '../designation/designation.routes';
+import designationRoutes from '../admin-role/admin-role.routes';
 
 const router = Router();
 
@@ -43,15 +43,16 @@ router.patch('/users/:userId', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMI
 router.patch('/users/:userId/archive', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_SUSPEND), AdminController.archiveUser);
 router.patch('/users/:userId/suspense', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_SUSPEND), AdminController.suspenseUser);
 router.patch('/users/:userId/restore', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_EDIT), AdminController.restoreUser);
-router.patch('/users/:userId/designation', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_EDIT), AdminController.assignDesignation);
+router.patch('/users/:userId/role', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_EDIT), AdminController.assignRole);
 router.delete('/users/:userId', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_SUSPEND), AdminController.archiveUser);
 
 // ── Plans ──────────────────────────────────────────────────────────────────
 router.get('/plans', checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_VIEW), AdminController.getPlans);
 router.post('/plans', checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_CREATE), validateBody(createPlanDto), AdminController.createPlan);
 
-// ── Designations ───────────────────────────────────────────────────────────
+// ── Admin Roles (platform-level) ───────────────────────────────────────────
 router.use('/designations', checkPlatformPermission(PLATFORM_PERMISSIONS.DESIGNATION_VIEW), designationRoutes);
+router.use('/roles', checkPlatformPermission(PLATFORM_PERMISSIONS.DESIGNATION_VIEW), designationRoutes);
 
 // ── Audit Logs ─────────────────────────────────────────────────────────────
 router.get('/audit-logs', checkPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_VIEW), AdminController.getAuditLogs);

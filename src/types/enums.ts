@@ -7,13 +7,13 @@ export enum GlobalRole {
   SUPPORT = 'SUPPORT',
 }
 
-// Admin panel modules (used for designation-based permissions)
+// Admin panel modules (used for role-based permissions)
 export enum AdminModule {
   DASHBOARD = 'DASHBOARD',
   ORGANIZATIONS = 'ORGANIZATIONS',
   SUBSCRIPTIONS = 'SUBSCRIPTIONS',
   USERS = 'USERS',
-  DESIGNATIONS = 'DESIGNATIONS',
+  ROLES = 'ROLES',
   AUDIT = 'AUDIT',
   ANALYTICS = 'ANALYTICS',
   SETTINGS = 'SETTINGS',

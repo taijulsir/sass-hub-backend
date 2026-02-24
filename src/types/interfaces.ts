@@ -95,8 +95,8 @@ export interface IUser {
   suspensedAt?: Date;
   suspensedBy?: Types.ObjectId;
 
-  // Designation-based admin permissions
-  designationId?: Types.ObjectId | null;
+  // Admin role (platform-level permissions)
+  roleId?: Types.ObjectId | null;
 
   createdAt: Date;
   updatedAt: Date;

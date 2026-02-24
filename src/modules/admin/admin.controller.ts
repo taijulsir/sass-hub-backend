@@ -217,17 +217,17 @@ export class AdminController {
     }
   }
 
-  // Assign designation to user
-  static async assignDesignation(
+  // Assign admin role to user
+  static async assignRole(
     req: AuthenticatedRequest,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
       const { userId } = req.params;
-      const { designationId } = req.body; // null removes the designation
-      const user = await AdminService.assignDesignation(userId, designationId ?? null, req.user!.userId);
-      sendSuccess(res, user, 'Designation assigned successfully');
+      const { roleId } = req.body; // null removes the role
+      const user = await AdminService.assignRole(userId, roleId ?? null, req.user!.userId);
+      sendSuccess(res, user, 'Role assigned successfully');
     } catch (error) {
       next(error);
     }
