@@ -280,9 +280,9 @@ export class AdminService {
     }
 
     // ── User tabs ─────────────────────────────────────────────────────────
-    // Only show admin-panel users (SUPER_ADMIN, ADMIN, SUPPORT) – never org members
+    // Show all platform users (everyone except pure org MEMBER role)
     const filter: Record<string, unknown> = {
-      globalRole: { $in: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN, GlobalRole.SUPPORT] },
+      globalRole: { $in: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN, GlobalRole.USER, GlobalRole.SUPPORT] },
     };
 
     if (tab === 'archived' || tab === 'deactivated') {

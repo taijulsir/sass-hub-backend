@@ -9,9 +9,10 @@ import { AuditService } from '../audit/audit.service';
 import { AuditAction } from '../../types/enums';
 import crypto from 'crypto';
 import { Membership } from '../membership/membership.model';
-import { OrgRole } from '../../types/enums';
+import { OrgRole, InvitationStatus } from '../../types/enums';
 import { MailService } from '../mail/mail.service';
 import { env } from '../../config/env';
+import { Invitation } from '../invitation/invitation.model';
 
 export class AuthService {
   // Register a new user
@@ -36,12 +37,23 @@ export class AuthService {
       throw ApiError.conflict('User with this email already exists', 'EMAIL_EXISTS');
     }
 
+    // Look up the invitation record to determine the correct globalRole
+    let invitedGlobalRole = GlobalRole.USER;
+    let pendingInvitation = null;
+    if (dto.token) {
+      pendingInvitation = await Invitation.findOne({ email, status: InvitationStatus.PENDING });
+      // Admin-panel invitations have no organizationId — treat them as ADMIN users
+      if (pendingInvitation && !pendingInvitation.organizationId) {
+        invitedGlobalRole = GlobalRole.ADMIN;
+      }
+    }
+
     // Create user
     const user = await User.create({
       name: dto.name,
       email,
       password: dto.password,
-      globalRole: GlobalRole.USER,
+      globalRole: dto.token ? invitedGlobalRole : GlobalRole.USER,
       isEmailVerified: !!dto.token, // Auto-verify if they came from an invite
     });
 
@@ -69,6 +81,12 @@ export class AuthService {
         resourceId: user._id.toString(),
         metadata: { method: 'invitation' },
       });
+    }
+
+    // Mark the invitation as accepted so it no longer appears in the invited tab
+    if (pendingInvitation) {
+      pendingInvitation.status = InvitationStatus.ACCEPTED;
+      await pendingInvitation.save();
     }
 
     // Generate tokens
