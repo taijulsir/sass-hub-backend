@@ -424,4 +424,18 @@ export class AdminController {
       next(error);
     }
   }
+
+  // Resend invitation
+  static async resendInvite(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const result = await AdminService.resendInvite(req.params.invitationId, req.user!.userId);
+      sendSuccess(res, result, 'Invitation resent successfully', HttpStatus.OK);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

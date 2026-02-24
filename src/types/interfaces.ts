@@ -131,6 +131,7 @@ export interface IMembership {
 export interface IInvitation {
   _id: Types.ObjectId;
   email: string;
+  name?: string;
   organizationId?: Types.ObjectId;
   role: OrgRole;
   customRoleId?: string;

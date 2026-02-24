@@ -14,6 +14,11 @@ const invitationSchema = new Schema<IInvitationDocument>(
       trim: true,
       match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email'],
     },
+    name: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     organizationId: {
       type: Schema.Types.ObjectId,
       ref: 'Organization',

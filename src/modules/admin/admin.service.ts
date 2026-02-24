@@ -261,7 +261,7 @@ export class AdminService {
       // Shape invitations to look like user rows for the frontend table
       const data = invitations.map((inv: any) => ({
         _id: inv._id,
-        name: '—',
+        name: inv.name || '—',
         email: inv.email,
         role: inv.role,
         avatar: inv.avatar || null,
@@ -386,6 +386,7 @@ export class AdminService {
     // ── Save invitation record to DB ──────────────────────────────────────
     const invitation = await Invitation.create({
       email,
+      name: name || '',
       ...(organizationId ? { organizationId } : {}),
       status: InvitationStatus.PENDING,
       role: globalRole || OrgRole.MEMBER,
@@ -418,6 +419,41 @@ export class AdminService {
     });
 
     return { success: true, message: 'Invitation sent successfully' };
+  }
+
+  // Resend invitation
+  static async resendInvite(invitationId: string, adminId: string) {
+    const invitation = await Invitation.findById(invitationId);
+    if (!invitation) throw ApiError.notFound('Invitation not found');
+    if (invitation.status !== InvitationStatus.PENDING) {
+      throw ApiError.badRequest('Only pending invitations can be resent');
+    }
+
+    // Refresh token + expiry
+    const token = generateInvitationToken(invitation.email, invitation.organizationId?.toString());
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    invitation.token = token;
+    invitation.expiresAt = expiresAt;
+    await invitation.save();
+
+    const inviteLink = `${env.adminFrontendUrl}/register?token=${token}`;
+    let organizationName = 'SaaS Admin Hub';
+    if (invitation.organizationId) {
+      const org = await Organization.findById(invitation.organizationId);
+      if (org) organizationName = org.name;
+    }
+
+    await MailService.sendOwnerInvite(invitation.email, (invitation as any).name || invitation.email, organizationName, inviteLink);
+
+    await AuditService.log({
+      userId: adminId,
+      action: AuditAction.USER_INVITED,
+      resource: 'Invitation',
+      resourceId: invitation._id.toString(),
+      metadata: { invitedEmail: invitation.email, byAdmin: true, type: 'resend' },
+    });
+
+    return { success: true, message: 'Invitation resent successfully' };
   }
 
   // Archive user (Instead of hard delete)
