@@ -1,6 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
-import { uploadImage } from "../../utils/storage";
+import { uploadImage, deleteImage } from "../../utils/storage";
 import { authenticate } from "../../middlewares/auth.middleware";
 import { ApiError } from "../../utils/api-error";
 
@@ -32,6 +32,19 @@ router.post("/image", authenticate, upload.single("image"), async (req, res, nex
     const imageUrl = await uploadImage(req.file, folder, width, height);
 
     res.json({ success: true, message: "Image uploaded successfully", data: { url: imageUrl } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /upload/image  — rollback a just-uploaded image if the parent operation fails
+router.delete("/image", authenticate, async (req, res, next) => {
+  try {
+    const url = req.body.url as string;
+    if (!url) throw new ApiError(400, "Image URL is required");
+
+    await deleteImage(url);
+    res.json({ success: true, message: "Image deleted successfully" });
   } catch (error) {
     next(error);
   }

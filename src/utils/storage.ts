@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import { v4 as uuidv4 } from "uuid";
 import { env } from "../config/env";
@@ -56,5 +56,31 @@ export const uploadImage = async (
   } catch (error) {
     console.error("Storage upload error:", error);
     throw new ApiError(500, "Failed to upload image");
+  }
+};
+
+/**
+ * Delete an object from DigitalOcean Spaces by its public URL.
+ * Silently ignores missing keys so callers don't need to worry about
+ * double-deletes or already-cleaned-up files.
+ */
+export const deleteImage = async (url: string): Promise<void> => {
+  try {
+    if (!url) return;
+
+    const publicBase = env.DO_ENDPOINT.replace('https://', `https://${BUCKET_NAME}.`);
+    if (!url.startsWith(publicBase)) return; // not our bucket, skip
+
+    const key = url.replace(`${publicBase}/`, '');
+
+    const command = new DeleteObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    });
+
+    await s3Client.send(command);
+  } catch (error) {
+    // Log but do not throw — deletion failure should never surface to the user
+    console.error("Storage delete error:", error);
   }
 };

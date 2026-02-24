@@ -38,6 +38,9 @@ const invitationSchema = new Schema<IInvitationDocument>(
       ref: 'User',
       required: [true, 'Inviter is required'],
     },
+    avatar: {
+      type: String,
+    },
     token: {
       type: String,
       required: true,

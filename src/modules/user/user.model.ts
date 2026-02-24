@@ -64,6 +64,25 @@ const userSchema = new Schema<IUserDocument>(
       type: Boolean,
       default: true,
     },
+    status: {
+      type: String,
+      default: 'active',
+    },
+    suspenseNote: {
+      type: String,
+    },
+    suspensedAt: {
+      type: Date,
+    },
+    suspensedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    designationId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Designation',
+      default: null,
+    },
   },
   {
     timestamps: true,
