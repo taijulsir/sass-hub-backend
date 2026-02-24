@@ -44,7 +44,7 @@ export class AuthController {
   // Login
   static async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { user, tokens, designation } = await AuthService.login(req.body);
+      const { user, tokens, platformPermissions, platformRoles } = await AuthService.login(req.body);
 
       // Set refresh token in HTTP-only cookie
       res.cookie('refreshToken', tokens.refreshToken, getCookieOptions());
@@ -59,15 +59,10 @@ export class AuthController {
             globalRole: user.globalRole,
             avatar: user.avatar,
             designationId: user.designationId,
-            designation: designation
-              ? { id: designation._id, name: designation.name }
-              : null,
-            // Flat permissions map: { USERS: ['VIEW','CREATE'], AUDIT: ['VIEW'] }
-            permissions: designation
-              ? Object.fromEntries(
-                  designation.permissions.map((p: any) => [p.module, p.actions])
-                )
-              : null,
+            // Flat string[] of permission names: ['ORG_VIEW', 'ADMIN_INVITE', ...]
+            permissions: platformPermissions,
+            // Role names: ['SUPER_ADMIN'] / ['SUPPORT_ADMIN']
+            platformRoles,
           },
           accessToken: tokens.accessToken,
         },

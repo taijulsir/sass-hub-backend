@@ -94,7 +94,7 @@ export class AuthService {
   }
 
   // Login user
-  static async login(dto: LoginDto): Promise<{ user: IUserDocument; tokens: TokenPair; designation?: any }> {
+  static async login(dto: LoginDto): Promise<{ user: IUserDocument; tokens: TokenPair; platformPermissions: string[]; platformRoles: string[] }> {
     // Find user with password
     const user = await User.findByEmail(dto.email);
     if (!user) {
@@ -119,12 +119,15 @@ export class AuthService {
     user.refreshToken = hashedRefreshToken;
     await user.save();
 
-    // Load designation + permissions for admin-panel users
-    let designation: any = null;
-    if (user.designationId) {
-      const { Designation } = await import('../designation/designation.model');
-      designation = await Designation.findById(user.designationId).lean();
-    }
+    // Load platform RBAC permissions for admin-panel users
+    const { PlatformRbacService } = await import('../platform-rbac/platform-rbac.service');
+    const { UserPlatformRole } = await import('../platform-rbac/user-platform-role.model');
+
+    const platformPermissions = await PlatformRbacService.getUserPlatformPermissions(user._id.toString());
+    const userRoles = await UserPlatformRole.find({ userId: user._id })
+      .populate<{ roleId: { name: string } }>('roleId', 'name')
+      .lean();
+    const platformRoles = userRoles.map((ur) => (ur.roleId as any)?.name).filter(Boolean);
 
     // Create audit log
     await AuditService.log({
@@ -133,7 +136,7 @@ export class AuthService {
       metadata: { email: user.email },
     });
 
-    return { user, tokens, designation };
+    return { user, tokens, platformPermissions, platformRoles };
   }
 
   // Refresh tokens
