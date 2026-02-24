@@ -2,13 +2,25 @@ import { Request, Response, NextFunction } from 'express';
 import { AuthService } from './auth.service';
 import { AuthenticatedRequest } from '../../types/interfaces';
 import { sendSuccess } from '../../utils/response';
-import { HttpStatus } from '../../utils/api-error';
+import { HttpStatus, ApiError } from '../../utils/api-error';
+import { env } from '../../config/env';
+
+// Cookie options helper
+const getCookieOptions = () => ({
+  httpOnly: true,
+  secure: env.nodeEnv === 'production',
+  sameSite: 'strict' as const,
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (matches refresh token expiry)
+});
 
 export class AuthController {
   // Register
   static async register(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { user, tokens } = await AuthService.register(req.body);
+
+      // Set refresh token in HTTP-only cookie
+      res.cookie('refreshToken', tokens.refreshToken, getCookieOptions());
 
       sendSuccess(
         res,
@@ -19,7 +31,7 @@ export class AuthController {
             email: user.email,
             globalRole: user.globalRole,
           },
-          tokens,
+          accessToken: tokens.accessToken,
         },
         'Registration successful',
         HttpStatus.CREATED
@@ -32,7 +44,10 @@ export class AuthController {
   // Login
   static async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { user, tokens } = await AuthService.login(req.body);
+      const { user, tokens, designation } = await AuthService.login(req.body);
+
+      // Set refresh token in HTTP-only cookie
+      res.cookie('refreshToken', tokens.refreshToken, getCookieOptions());
 
       sendSuccess(
         res,
@@ -42,8 +57,19 @@ export class AuthController {
             name: user.name,
             email: user.email,
             globalRole: user.globalRole,
+            avatar: user.avatar,
+            designationId: user.designationId,
+            designation: designation
+              ? { id: designation._id, name: designation.name }
+              : null,
+            // Flat permissions map: { USERS: ['VIEW','CREATE'], AUDIT: ['VIEW'] }
+            permissions: designation
+              ? Object.fromEntries(
+                  designation.permissions.map((p: any) => [p.module, p.actions])
+                )
+              : null,
           },
-          tokens,
+          accessToken: tokens.accessToken,
         },
         'Login successful'
       );
@@ -55,10 +81,17 @@ export class AuthController {
   // Refresh tokens
   static async refreshToken(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { refreshToken } = req.body;
+      const refreshToken = req.cookies.refreshToken;
+      if (!refreshToken) {
+        throw ApiError.unauthorized('Refresh token not found');
+      }
+
       const tokens = await AuthService.refreshTokens(refreshToken);
 
-      sendSuccess(res, { tokens }, 'Tokens refreshed');
+      // Set new refresh token in cookie (Rotation)
+      res.cookie('refreshToken', tokens.refreshToken, getCookieOptions());
+
+      sendSuccess(res, { accessToken: tokens.accessToken }, 'Tokens refreshed');
     } catch (error) {
       next(error);
     }
@@ -67,7 +100,16 @@ export class AuthController {
   // Logout
   static async logout(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      // Clear refresh token from DB
       await AuthService.logout(req.user!.userId);
+
+      // Clear cookie
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: env.nodeEnv === 'production',
+        sameSite: 'strict',
+      });
+
       sendSuccess(res, null, 'Logged out successfully');
     } catch (error) {
       next(error);

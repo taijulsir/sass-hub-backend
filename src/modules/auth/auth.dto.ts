@@ -36,13 +36,6 @@ export const loginDto = z.object({
 
 export type LoginDto = z.infer<typeof loginDto>;
 
-// Refresh token DTO
-export const refreshTokenDto = z.object({
-  refreshToken: z.string().min(1, 'Refresh token is required'),
-});
-
-export type RefreshTokenDto = z.infer<typeof refreshTokenDto>;
-
 // Change password DTO
 export const changePasswordDto = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),

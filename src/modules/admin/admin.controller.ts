@@ -156,6 +156,83 @@ export class AdminController {
     }
   }
 
+  // Check email status
+  static async checkEmailStatus(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { email } = req.query as Record<string, string>;
+      const status = await AdminService.checkEmailStatus(email);
+      sendSuccess(res, status);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Archive user
+  static async archiveUser(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { userId } = req.params;
+      await AdminService.archiveUser(userId, req.user!.userId);
+      sendSuccess(res, null, 'User archived successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Suspense user
+  static async suspenseUser(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const { note } = req.body;
+      await AdminService.suspenseUser(userId, req.user!.userId, note);
+      sendSuccess(res, null, 'User suspended successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Restore user
+  static async restoreUser(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { userId } = req.params;
+      await AdminService.restoreUser(userId, req.user!.userId);
+      sendSuccess(res, null, 'User restored successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Assign designation to user
+  static async assignDesignation(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const { designationId } = req.body; // null removes the designation
+      const user = await AdminService.assignDesignation(userId, designationId ?? null, req.user!.userId);
+      sendSuccess(res, user, 'Designation assigned successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Create user (Admin)
   static async createUser(
     req: AuthenticatedRequest,
@@ -286,25 +363,6 @@ export class AdminController {
       );
 
       sendSuccess(res, { organization }, 'Organization archived successfully');
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  // Archive user
-  static async archiveUser(
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { userId } = req.params;
-      const user = await AdminService.archiveUser(
-        userId,
-        req.user!.userId
-      );
-
-      sendSuccess(res, { user }, 'User archived successfully');
     } catch (error) {
       next(error);
     }

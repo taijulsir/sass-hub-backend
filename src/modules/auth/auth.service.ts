@@ -94,7 +94,7 @@ export class AuthService {
   }
 
   // Login user
-  static async login(dto: LoginDto): Promise<{ user: IUserDocument; tokens: TokenPair }> {
+  static async login(dto: LoginDto): Promise<{ user: IUserDocument; tokens: TokenPair; designation?: any }> {
     // Find user with password
     const user = await User.findByEmail(dto.email);
     if (!user) {
@@ -119,6 +119,13 @@ export class AuthService {
     user.refreshToken = hashedRefreshToken;
     await user.save();
 
+    // Load designation + permissions for admin-panel users
+    let designation: any = null;
+    if (user.designationId) {
+      const { Designation } = await import('../designation/designation.model');
+      designation = await Designation.findById(user.designationId).lean();
+    }
+
     // Create audit log
     await AuditService.log({
       userId: user._id.toString(),
@@ -126,7 +133,7 @@ export class AuthService {
       metadata: { email: user.email },
     });
 
-    return { user, tokens };
+    return { user, tokens, designation };
   }
 
   // Refresh tokens
