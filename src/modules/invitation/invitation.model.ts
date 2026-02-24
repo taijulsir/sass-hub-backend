@@ -17,7 +17,7 @@ const invitationSchema = new Schema<IInvitationDocument>(
     organizationId: {
       type: Schema.Types.ObjectId,
       ref: 'Organization',
-      required: [true, 'Organization is required'],
+      required: false, // optional for admin-level invitations (no org yet)
     },
     role: {
       type: String,

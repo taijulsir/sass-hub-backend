@@ -6,8 +6,9 @@ import { OrgRole, InvitationStatus, AuditAction } from '../../types/enums';
 import { CreateInvitationDto } from './invitation.dto';
 import { AuditService } from '../audit/audit.service';
 import { Role } from '../role/role.model';
-import { EmailService } from '../email/email.service';
+import { MailService } from '../mail/mail.service';
 import { Organization } from '../organization/organization.model';
+import { env } from '../../config/env';
 
 export class InvitationService {
   // Create invitation
@@ -71,11 +72,13 @@ export class InvitationService {
       const organization = await Organization.findById(organizationId);
 
       if (inviter && organization) {
-        await EmailService.sendInvitation(
+        const inviteLink = `${env.adminFrontendUrl}/accept-invite?token=${invitation.token}`;
+        
+        await MailService.sendOwnerInvite(
           dto.email,
-          invitation.token,
-          inviter.name,
-          organization.name
+          dto.email, // Using email as name for now
+          organization.name,
+          inviteLink
         );
       }
     } catch (error) {

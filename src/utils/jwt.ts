@@ -33,6 +33,15 @@ export function generateTokenPair(
   };
 }
 
+// Generate invitation token
+export function generateInvitationToken(email: string, organizationId?: string): string {
+  const payload = { email, organizationId, type: 'invitation' };
+  const options: SignOptions = {
+    expiresIn: '24h',
+  };
+  return jwt.sign(payload, env.jwt.accessSecret, options);
+}
+
 // Verify access token
 export function verifyAccessToken(token: string): JwtPayload {
   return jwt.verify(token, env.jwt.accessSecret) as JwtPayload;
@@ -41,6 +50,15 @@ export function verifyAccessToken(token: string): JwtPayload {
 // Verify refresh token
 export function verifyRefreshToken(token: string): JwtPayload {
   return jwt.verify(token, env.jwt.refreshSecret) as JwtPayload;
+}
+
+// Verify invitation token
+export function verifyInvitationToken(token: string): { email: string, organizationId?: string } {
+  const decoded = jwt.verify(token, env.jwt.accessSecret) as any;
+  if (decoded.type !== 'invitation') {
+    throw new Error('Invalid token type');
+  }
+  return { email: decoded.email, organizationId: decoded.organizationId };
 }
 
 // Decode token without verification (for debugging)

@@ -24,6 +24,9 @@ const organizationSchema = new Schema<IOrganizationDocument>(
       type: String,
       maxlength: [500, 'Description must be less than 500 characters'],
     },
+    logo: {
+      type: String,
+    },
     ownerId: {
       type: Schema.Types.ObjectId,
       ref: 'User',

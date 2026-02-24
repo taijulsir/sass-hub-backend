@@ -98,6 +98,7 @@ export interface IOrganization {
   name: string;
   slug: string;
   description?: string;
+  logo?: string;
   ownerId: Types.ObjectId;
   plan: string;
   status: string;
@@ -123,7 +124,7 @@ export interface IMembership {
 export interface IInvitation {
   _id: Types.ObjectId;
   email: string;
-  organizationId: Types.ObjectId;
+  organizationId?: Types.ObjectId;
   role: OrgRole;
   customRoleId?: string;
   status: string;
