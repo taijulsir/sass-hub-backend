@@ -43,7 +43,6 @@ router.patch('/users/:userId', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMI
 router.patch('/users/:userId/archive', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_SUSPEND), AdminController.archiveUser);
 router.patch('/users/:userId/suspense', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_SUSPEND), AdminController.suspenseUser);
 router.patch('/users/:userId/restore', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_EDIT), AdminController.restoreUser);
-router.patch('/users/:userId/role', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_EDIT), AdminController.assignRole);
 router.delete('/users/:userId', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_SUSPEND), AdminController.archiveUser);
 
 // ── Plans ──────────────────────────────────────────────────────────────────

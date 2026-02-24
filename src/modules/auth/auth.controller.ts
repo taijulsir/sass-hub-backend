@@ -58,7 +58,6 @@ export class AuthController {
             email: user.email,
             globalRole: user.globalRole,
             avatar: user.avatar,
-            roleId: user.roleId,
             // Flat string[] of permission names: ['ORG_VIEW', 'ADMIN_INVITE', ...]
             permissions: platformPermissions,
             // Role names: ['SUPER_ADMIN'] / ['SUPPORT_ADMIN']

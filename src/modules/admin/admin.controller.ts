@@ -217,22 +217,6 @@ export class AdminController {
     }
   }
 
-  // Assign admin role to user
-  static async assignRole(
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { userId } = req.params;
-      const { roleId } = req.body; // null removes the role
-      const user = await AdminService.assignRole(userId, roleId ?? null, req.user!.userId);
-      sendSuccess(res, user, 'Role assigned successfully');
-    } catch (error) {
-      next(error);
-    }
-  }
-
   // Create user (Admin)
   static async createUser(
     req: AuthenticatedRequest,

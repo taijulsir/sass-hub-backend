@@ -479,31 +479,6 @@ export class AdminService {
     return user;
   }
 
-  // Assign admin role to a user
-  static async assignRole(userId: string, roleId: string | null, adminId: string) {
-    const user = await User.findById(userId);
-    if (!user) throw ApiError.notFound('User not found');
-
-    if (roleId) {
-      const { AdminRole } = await import('../admin-role/admin-role.model');
-      const role = await AdminRole.findById(roleId);
-      if (!role || !role.isActive) throw ApiError.notFound('Role not found');
-    }
-
-    user.roleId = roleId ? new Types.ObjectId(roleId) : null;
-    await user.save();
-
-    await AuditService.log({
-      userId: adminId,
-      action: AuditAction.USER_UPDATED,
-      resource: 'User',
-      resourceId: userId,
-      metadata: { roleAssigned: roleId, byAdmin: true },
-    });
-
-    return User.findById(userId).populate('roleId', 'name permissions');
-  }
-
   // Get dashboard statistics
   static async getDashboardStats() {
     const [

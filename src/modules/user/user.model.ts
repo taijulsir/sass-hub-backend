@@ -78,11 +78,6 @@ const userSchema = new Schema<IUserDocument>(
       type: Schema.Types.ObjectId,
       ref: 'User',
     },
-    roleId: {
-      type: Schema.Types.ObjectId,
-      ref: 'Designation',
-      default: null,
-    },
   },
   {
     timestamps: true,
