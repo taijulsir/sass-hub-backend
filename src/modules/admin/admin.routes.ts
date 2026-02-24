@@ -33,6 +33,7 @@ router.delete('/organizations/:organizationId', AdminController.archiveOrganizat
 // Users
 router.get('/users', AdminController.getUsers);
 router.post('/users', AdminController.createUser);
+router.post('/users/invite', AdminController.inviteUser);
 router.patch('/users/:userId', AdminController.updateUser);
 router.delete('/users/:userId', AdminController.archiveUser);
 

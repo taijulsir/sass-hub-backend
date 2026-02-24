@@ -1,15 +1,20 @@
 import { Organization, IOrganizationDocument } from '../organization/organization.model';
 import { User, IUserDocument } from '../user/user.model';
+import { Invitation } from '../invitation/invitation.model';
 import { Subscription } from '../subscription/subscription.model';
 import { SubscriptionHistory } from '../subscription/subscription-history.model';
 import { Membership } from '../membership/membership.model';
 import { Plan as PlanModel, IPlanDocument } from './plan.model';
 import { ApiError } from '../../utils/api-error';
-import { OrgStatus, Plan, AuditAction, GlobalRole } from '../../types/enums';
+import { OrgStatus, Plan, AuditAction, GlobalRole, InvitationStatus } from '../../types/enums';
 import { PaginatedResponse } from '../../types/interfaces';
 import { parsePagination } from '../../utils/response';
 import { AuditService } from '../audit/audit.service';
 import { CreatePlanDto } from './admin.dto';
+import { generateInvitationToken } from '../../utils/jwt';
+import { MailService } from '../mail/mail.service';
+import { env } from '../../config/env';
+import { logger } from '../../config/logger';
 
 export interface AdminOrgQueryParams {
   status?: OrgStatus;
@@ -62,7 +67,7 @@ export class AdminService {
 
     const totalPages = Math.ceil(total / limit);
 
-    return {
+    const result: PaginatedResponse<IOrganizationDocument> = {
       data: organizations,
       pagination: {
         total,
@@ -73,6 +78,8 @@ export class AdminService {
         hasPrev: page > 1,
       },
     };
+    
+    return result;
   }
 
   // Get organization by ID with details
@@ -179,13 +186,30 @@ export class AdminService {
   // Create organization
   static async createOrganization(data: any, adminId: string): Promise<IOrganizationDocument> {
     const slug = data.name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
+    
+    // Check if we need to invite an owner
+    const { ownerEmail, ownerName, ...orgData } = data;
+    
     const organization = await Organization.create({
-      ...data,
+      ...orgData,
       slug,
-      ownerId: adminId, // Defaulting owner to the creating admin for now
+      ownerId: adminId, // Initially set to admin until they accept invite
       status: OrgStatus.ACTIVE,
       isActive: true,
+      logo: data.logo || null,
     });
+
+    // Handle owner invitation if provided
+    if (ownerEmail && ownerName) {
+      // Generate invite token for owner
+      const token = generateInvitationToken(ownerEmail, organization._id.toString());
+      const inviteLink = `${env.adminFrontendUrl}/register?token=${token}`;
+      
+      // Enqueue owner-invite email
+      await MailService.sendOwnerInvite(ownerEmail, ownerName, organization.name, inviteLink);
+      
+      logger.info(`Owner invitation queued for ${ownerEmail} for organization ${organization.name}`);
+    }
 
     // Create default subscription
     await Subscription.create({
@@ -208,14 +232,55 @@ export class AdminService {
   }
 
   // Get all users
-  static async getUsers(params: { page?: number; limit?: number; search?: string; isActive?: boolean }) {
+  static async getUsers(params: { page?: number; limit?: number; search?: string; tab?: string }) {
     const { page, limit, skip } = parsePagination({
       page: params.page?.toString(),
       limit: params.limit?.toString(),
     });
 
+    const tab = params.tab || 'active';
+
+    // ── Invited tab: query pending invitations instead of users ───────────
+    if (tab === 'invited') {
+      const inviteFilter: Record<string, unknown> = { status: InvitationStatus.PENDING };
+
+      if (params.search) {
+        inviteFilter.email = { $regex: params.search, $options: 'i' };
+      }
+
+      const total = await Invitation.countDocuments(inviteFilter);
+      const invitations = await Invitation.find(inviteFilter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('invitedBy', 'name email');
+
+      const totalPages = Math.ceil(total / limit);
+
+      // Shape invitations to look like user rows for the frontend table
+      const data = invitations.map((inv: any) => ({
+        _id: inv._id,
+        name: '—',
+        email: inv.email,
+        role: inv.role,
+        avatar: null,
+        createdAt: inv.createdAt,
+        invitedBy: inv.invitedBy,
+        inviteStatus: inv.status,
+        expiresAt: inv.expiresAt,
+        _type: 'invitation',
+      }));
+
+      const result: PaginatedResponse<any> = {
+        data,
+        pagination: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrev: page > 1 },
+      };
+      return result;
+    }
+
+    // ── Active / Deactivated tabs: query users ────────────────────────────
     const filter: Record<string, unknown> = {
-      isActive: params.isActive !== undefined ? params.isActive : true,
+      isActive: tab === 'deactivated' ? false : true,
     };
 
     if (params.search) {
@@ -234,7 +299,7 @@ export class AdminService {
 
     const totalPages = Math.ceil(total / limit);
 
-    return {
+    const result: PaginatedResponse<any> = {
       data: users,
       pagination: {
         total,
@@ -245,26 +310,85 @@ export class AdminService {
         hasPrev: page > 1,
       },
     };
+
+    return result;
   }
 
   // Create user
   static async createUser(data: any, adminId: string): Promise<IUserDocument> {
     const user = await User.create({
       ...data,
-      password: 'DefaultPassword123!', // Admin created users should have a way to reset
+      password: data.password || 'DefaultPassword123!', // Admin created users should have a way to reset
       globalRole: data.globalRole || GlobalRole.USER,
+      avatar: data.avatar || null,
       isActive: true,
     });
 
     await AuditService.log({
       userId: adminId,
-      action: AuditAction.USER_CREATED,
+      action: AuditAction.USER_REGISTERED,
       resource: 'User',
       resourceId: user._id.toString(),
-      metadata: { createdUserId: user._id, byAdmin: true },
+      metadata: { email: user.email, byAdmin: true },
     });
 
     return user;
+  }
+
+  // Invite user
+  static async inviteUser(data: { name: string; email: string; globalRole?: GlobalRole; organizationId?: string }, adminId: string) {
+    const { name, email, globalRole, organizationId } = data;
+    
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      throw ApiError.conflict('User with this email already exists');
+    }
+
+    // Check for existing pending invitation
+    const existingInvite = await Invitation.findOne({ email, status: InvitationStatus.PENDING });
+    if (existingInvite) {
+      throw ApiError.conflict('A pending invitation already exists for this email');
+    }
+
+    // Generate token
+    const token = generateInvitationToken(email, organizationId);
+
+    // Expiry: 7 days
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    // ── Save invitation record to DB ──────────────────────────────────────
+    const invitation = await Invitation.create({
+      email,
+      ...(organizationId ? { organizationId } : {}),
+      status: InvitationStatus.PENDING,
+      invitedBy: adminId,
+      token,
+      expiresAt,
+    });
+
+    // Construct invitation link
+    const inviteLink = `${env.adminFrontendUrl}/register?token=${token}`;
+
+    // Get organization name if organizationId is provided
+    let organizationName = 'SaaS Admin Hub';
+    if (organizationId) {
+      const org = await Organization.findById(organizationId);
+      if (org) organizationName = org.name;
+    }
+
+    // Send asynchronous email
+    await MailService.sendOwnerInvite(email, name, organizationName, inviteLink);
+
+    // Audit log
+    await AuditService.log({
+      userId: adminId,
+      action: AuditAction.USER_INVITED,
+      resource: 'Invitation',
+      resourceId: invitation._id.toString(),
+      metadata: { invitedEmail: email, byAdmin: true, type: 'admin-invitation' },
+    });
+
+    return { success: true, message: 'Invitation sent successfully' };
   }
 
   // Get dashboard statistics
@@ -462,7 +586,7 @@ export class AdminService {
   // Update organization details
   static async updateOrganization(
     organizationId: string,
-    data: { name?: string; status?: OrgStatus; plan?: Plan },
+    data: { name?: string; status?: OrgStatus; plan?: Plan; logo?: string },
     adminId: string
   ): Promise<IOrganizationDocument> {
     const organization = await Organization.findById(organizationId);
@@ -473,6 +597,7 @@ export class AdminService {
     if (data.name) organization.name = data.name;
     if (data.status) organization.status = data.status;
     if (data.plan) organization.plan = data.plan;
+    if (data.logo) organization.logo = data.logo;
 
     await organization.save();
 
@@ -492,7 +617,7 @@ export class AdminService {
   // Update user details
   static async updateUser(
     userId: string,
-    data: { name?: string },
+    data: { name?: string; avatar?: string; globalRole?: GlobalRole },
     adminId: string
   ): Promise<IUserDocument> {
     const user = await User.findById(userId);
@@ -501,6 +626,8 @@ export class AdminService {
     }
 
     if (data.name) user.name = data.name;
+    if (data.avatar) user.avatar = data.avatar;
+    if (data.globalRole) user.globalRole = data.globalRole;
 
     await user.save();
 

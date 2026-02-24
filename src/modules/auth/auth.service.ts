@@ -1,19 +1,37 @@
 import bcrypt from 'bcrypt';
 import { User, IUserDocument } from '../user/user.model';
 import { ApiError } from '../../utils/api-error';
-import { generateTokenPair, verifyRefreshToken } from '../../utils/jwt';
+import { generateTokenPair, verifyRefreshToken, verifyInvitationToken } from '../../utils/jwt';
 import { TokenPair } from '../../types/interfaces';
 import { GlobalRole } from '../../types/enums';
 import { RegisterDto, LoginDto, ChangePasswordDto, ForgotPasswordDto, ResetPasswordDto } from './auth.dto';
 import { AuditService } from '../audit/audit.service';
 import { AuditAction } from '../../types/enums';
 import crypto from 'crypto';
+import { Membership } from '../membership/membership.model';
+import { OrgRole } from '../../types/enums';
+import { MailService } from '../mail/mail.service';
+import { env } from '../../config/env';
 
 export class AuthService {
   // Register a new user
-  static async register(dto: RegisterDto): Promise<{ user: IUserDocument; tokens: TokenPair }> {
+  static async register(dto: RegisterDto & { token?: string }): Promise<{ user: IUserDocument; tokens: TokenPair }> {
+    let email = dto.email.toLowerCase();
+    let organizationId: string | undefined;
+
+    // Verify invitation token if provided
+    if (dto.token) {
+      try {
+        const decoded = verifyInvitationToken(dto.token);
+        email = decoded.email.toLowerCase();
+        organizationId = decoded.organizationId;
+      } catch (error) {
+        throw ApiError.badRequest('Invalid or expired invitation token');
+      }
+    }
+
     // Check if user already exists
-    const existingUser = await User.findOne({ email: dto.email.toLowerCase() });
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
       throw ApiError.conflict('User with this email already exists', 'EMAIL_EXISTS');
     }
@@ -21,10 +39,37 @@ export class AuthService {
     // Create user
     const user = await User.create({
       name: dto.name,
-      email: dto.email.toLowerCase(),
+      email,
       password: dto.password,
       globalRole: GlobalRole.USER,
+      isEmailVerified: !!dto.token, // Auto-verify if they came from an invite
     });
+
+    // Send verification email if not an invite
+    if (!dto.token) {
+      // Generate a verification token (for this demo, we'll reuse the user ID or a separate token)
+      const verificationLink = `${env.adminFrontendUrl}/verify-email?token=${user._id}`;
+      await MailService.sendVerificationEmail(user.email, user.name, verificationLink);
+    }
+
+    // If an organization was part of the invite, join them
+    if (organizationId) {
+      await Membership.create({
+        organizationId,
+        userId: user._id,
+        role: OrgRole.MEMBER, // Default role for invitees
+        isActive: true,
+      });
+      
+      await AuditService.log({
+        organizationId,
+        userId: user._id.toString(),
+        action: AuditAction.INVITATION_ACCEPTED,
+        resource: 'User',
+        resourceId: user._id.toString(),
+        metadata: { method: 'invitation' },
+      });
+    }
 
     // Generate tokens
     const tokens = generateTokenPair(
@@ -182,13 +227,14 @@ export class AuthService {
     const resetToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
 
-    // Set token and expiration (1 hour)
+    // Set token and expiration (30 minutes as per requirements)
     user.set('resetPasswordToken', hashedToken);
-    user.set('resetPasswordExpires', Date.now() + 3600000);
+    user.set('resetPasswordExpires', Date.now() + 30 * 60 * 1000);
     await user.save();
 
-    // In a real app, send email here
-    console.log(`Reset token for ${user.email}: ${resetToken}`);
+    // Enqueue forgot-password email
+    const resetLink = `${env.adminFrontendUrl}/reset-password?token=${resetToken}`;
+    await MailService.sendForgotPasswordEmail(user.email, user.name, resetLink);
 
     // Create audit log
     await AuditService.log({

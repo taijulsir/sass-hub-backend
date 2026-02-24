@@ -134,13 +134,13 @@ export class AdminController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { search, page, limit, isActive } = req.query as Record<string, string>;
+      const { search, page, limit, tab } = req.query as Record<string, string>;
 
       const result = await AdminService.getUsers({
         search,
         page: page ? parseInt(page) : undefined,
         limit: limit ? parseInt(limit) : undefined,
-        isActive: isActive !== undefined ? isActive === 'true' : true,
+        tab: tab || 'active',
       });
 
       sendPaginated(
@@ -364,6 +364,20 @@ export class AdminController {
       );
 
       sendSuccess(res, { user }, 'User updated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Invite user (Admin)
+  static async inviteUser(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const result = await AdminService.inviteUser(req.body, req.user!.userId);
+      sendSuccess(res, result, 'Invitation sent successfully', HttpStatus.OK);
     } catch (error) {
       next(error);
     }
