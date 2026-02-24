@@ -51,7 +51,6 @@ router.get('/plans', checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_VIEW), Ad
 router.post('/plans', checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_CREATE), validateBody(createPlanDto), AdminController.createPlan);
 
 // ── Admin Roles (platform-level) ───────────────────────────────────────────
-router.use('/designations', checkPlatformPermission(PLATFORM_PERMISSIONS.DESIGNATION_VIEW), designationRoutes);
 router.use('/roles', checkPlatformPermission(PLATFORM_PERMISSIONS.DESIGNATION_VIEW), designationRoutes);
 
 // ── Audit Logs ─────────────────────────────────────────────────────────────
