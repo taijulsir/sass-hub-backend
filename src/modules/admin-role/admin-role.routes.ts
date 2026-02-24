@@ -5,6 +5,7 @@ const router = Router();
 
 router.get('/all', AdminRoleController.getAllActive);
 router.get('/', AdminRoleController.getRoles);
+router.get('/:id/user-count', AdminRoleController.getUserCount);
 router.get('/:id', AdminRoleController.getRole);
 router.post('/', AdminRoleController.createRole);
 router.patch('/:id', AdminRoleController.updateRole);

@@ -1,6 +1,8 @@
 import { AdminRole, IModulePermission } from './admin-role.model';
 import { ApiError } from '../../utils/api-error';
 import { parsePagination } from '../../utils/response';
+import { PlatformRole } from '../platform-rbac/platform-role.model';
+import { UserPlatformRole } from '../platform-rbac/user-platform-role.model';
 
 export class AdminRoleService {
   // ── List all roles (paginated) ────────────────────────────────────────────
@@ -88,6 +90,35 @@ export class AdminRoleService {
   static async archiveRole(id: string) {
     const role = await AdminRole.findById(id);
     if (!role) throw ApiError.notFound('Role not found');
+    role.isActive = false;
+    await role.save();
+    return role;
+  }
+
+  // ── Count users assigned to this role (via matching PlatformRole) ─────────
+  static async getUserCount(id: string): Promise<{ userCount: number; roleName: string }> {
+    const role = await AdminRole.findById(id).lean();
+    if (!role) throw ApiError.notFound('Role not found');
+
+    // Find the matching PlatformRole by name
+    const platformRole = await PlatformRole.findOne({ name: role.name }).lean();
+    if (!platformRole) return { userCount: 0, roleName: role.name };
+
+    const userCount = await UserPlatformRole.countDocuments({ roleId: platformRole._id });
+    return { userCount, roleName: role.name };
+  }
+
+  // ── Archive role and remove from all assigned users ───────────────────────
+  static async archiveRoleWithCleanup(id: string) {
+    const role = await AdminRole.findById(id);
+    if (!role) throw ApiError.notFound('Role not found');
+
+    // Find the matching PlatformRole by name and remove all user assignments
+    const platformRole = await PlatformRole.findOne({ name: role.name }).lean();
+    if (platformRole) {
+      await UserPlatformRole.deleteMany({ roleId: platformRole._id });
+    }
+
     role.isActive = false;
     await role.save();
     return role;

@@ -67,11 +67,21 @@ export class AdminRoleController {
     }
   }
 
-  // DELETE /admin/roles/:id  (soft archive)
+  // DELETE /admin/roles/:id  (soft archive + user cleanup)
   static async archiveRole(req: Request, res: Response, next: NextFunction) {
     try {
-      await AdminRoleService.archiveRole(req.params.id);
+      await AdminRoleService.archiveRoleWithCleanup(req.params.id);
       sendSuccess(res, null, 'Role archived');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // GET /admin/roles/:id/user-count
+  static async getUserCount(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await AdminRoleService.getUserCount(req.params.id);
+      sendSuccess(res, result, 'User count fetched');
     } catch (err) {
       next(err);
     }
