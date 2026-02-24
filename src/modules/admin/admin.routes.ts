@@ -3,6 +3,7 @@ import { AdminController } from './admin.controller';
 import { authenticate, requireSuperAdmin } from '../../middlewares/auth.middleware';
 import { validateBody } from '../../middlewares/validate.middleware';
 import { adminChangeOrgStatusDto, adminChangeOrgPlanDto, createPlanDto } from './admin.dto';
+import designationRoutes from '../designation/designation.routes';
 
 const router = Router();
 
@@ -32,14 +33,22 @@ router.delete('/organizations/:organizationId', AdminController.archiveOrganizat
 
 // Users
 router.get('/users', AdminController.getUsers);
+router.get('/users/check-email', AdminController.checkEmailStatus);
 router.post('/users', AdminController.createUser);
 router.post('/users/invite', AdminController.inviteUser);
 router.patch('/users/:userId', AdminController.updateUser);
-router.delete('/users/:userId', AdminController.archiveUser);
+router.patch('/users/:userId/archive', AdminController.archiveUser);
+router.patch('/users/:userId/suspense', AdminController.suspenseUser);
+router.patch('/users/:userId/restore', AdminController.restoreUser);
+router.patch('/users/:userId/designation', AdminController.assignDesignation);
+router.delete('/users/:userId', AdminController.archiveUser); // backward compat
 
 // Plans
 router.get('/plans', AdminController.getPlans);
 router.post('/plans', validateBody(createPlanDto), AdminController.createPlan);
+
+// Designations
+router.use('/designations', designationRoutes);
 
 // Audit Logs
 router.get('/audit-logs', AdminController.getAuditLogs);

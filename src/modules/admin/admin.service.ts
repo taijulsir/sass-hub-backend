@@ -6,7 +6,7 @@ import { SubscriptionHistory } from '../subscription/subscription-history.model'
 import { Membership } from '../membership/membership.model';
 import { Plan as PlanModel, IPlanDocument } from './plan.model';
 import { ApiError } from '../../utils/api-error';
-import { OrgStatus, Plan, AuditAction, GlobalRole, InvitationStatus } from '../../types/enums';
+import { OrgStatus, Plan, AuditAction, GlobalRole, OrgRole, InvitationStatus } from '../../types/enums';
 import { PaginatedResponse } from '../../types/interfaces';
 import { parsePagination } from '../../utils/response';
 import { AuditService } from '../audit/audit.service';
@@ -15,6 +15,7 @@ import { generateInvitationToken } from '../../utils/jwt';
 import { MailService } from '../mail/mail.service';
 import { env } from '../../config/env';
 import { logger } from '../../config/logger';
+import { Types } from 'mongoose';
 
 export interface AdminOrgQueryParams {
   status?: OrgStatus;
@@ -263,7 +264,7 @@ export class AdminService {
         name: '—',
         email: inv.email,
         role: inv.role,
-        avatar: null,
+        avatar: inv.avatar || null,
         createdAt: inv.createdAt,
         invitedBy: inv.invitedBy,
         inviteStatus: inv.status,
@@ -278,10 +279,22 @@ export class AdminService {
       return result;
     }
 
-    // ── Active / Deactivated tabs: query users ────────────────────────────
+    // ── User tabs ─────────────────────────────────────────────────────────
+    // Only show admin-panel users (SUPER_ADMIN, ADMIN, SUPPORT) – never org members
     const filter: Record<string, unknown> = {
-      isActive: tab === 'deactivated' ? false : true,
+      globalRole: { $in: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN, GlobalRole.SUPPORT] },
     };
+
+    if (tab === 'archived' || tab === 'deactivated') {
+      filter.isActive = false;
+    } else if (tab === 'suspended') {
+      filter.isActive = true;
+      filter.status = 'suspended';
+    } else {
+      // Default: Active
+      filter.isActive = true;
+      filter.status = 'active';
+    }
 
     if (params.search) {
       filter.$or = [
@@ -295,7 +308,9 @@ export class AdminService {
     const users = await User.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .populate('designationId', 'name')
+      .lean();
 
     const totalPages = Math.ceil(total / limit);
 
@@ -314,6 +329,18 @@ export class AdminService {
     return result;
   }
 
+  // Check email availability
+  static async checkEmailStatus(email: string) {
+    const user = await User.findOne({ email });
+    const invite = await Invitation.findOne({ email, status: InvitationStatus.PENDING });
+    
+    return {
+      exists: !!user,
+      hasInvite: !!invite,
+      available: !user && !invite,
+    };
+  }
+
   // Create user
   static async createUser(data: any, adminId: string): Promise<IUserDocument> {
     const user = await User.create({
@@ -322,22 +349,23 @@ export class AdminService {
       globalRole: data.globalRole || GlobalRole.USER,
       avatar: data.avatar || null,
       isActive: true,
+      isEmailVerified: true, // Admin created users are verified
     });
 
     await AuditService.log({
       userId: adminId,
-      action: AuditAction.USER_REGISTERED,
+      action: AuditAction.USER_UPDATED,
       resource: 'User',
       resourceId: user._id.toString(),
-      metadata: { email: user.email, byAdmin: true },
+      metadata: { email: user.email, byAdmin: true, created: true },
     });
 
     return user;
   }
 
   // Invite user
-  static async inviteUser(data: { name: string; email: string; globalRole?: GlobalRole; organizationId?: string }, adminId: string) {
-    const { name, email, globalRole, organizationId } = data;
+  static async inviteUser(data: { name: string; email: string; globalRole?: GlobalRole; organizationId?: string; avatar?: string }, adminId: string) {
+    const { name, email, globalRole, organizationId, avatar } = data;
     
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -361,7 +389,9 @@ export class AdminService {
       email,
       ...(organizationId ? { organizationId } : {}),
       status: InvitationStatus.PENDING,
+      role: globalRole || OrgRole.MEMBER,
       invitedBy: adminId,
+      avatar,
       token,
       expiresAt,
     });
@@ -389,6 +419,89 @@ export class AdminService {
     });
 
     return { success: true, message: 'Invitation sent successfully' };
+  }
+
+  // Archive user (Instead of hard delete)
+  static async archiveUser(userId: string, adminId: string) {
+    const user = await User.findById(userId);
+    if (!user) throw ApiError.notFound('User not found');
+
+    user.isActive = false;
+    await user.save();
+
+    await AuditService.log({
+      userId: adminId,
+      action: AuditAction.USER_DELETED,
+      resource: 'User',
+      resourceId: userId,
+      metadata: { archived: true },
+    });
+
+    return user;
+  }
+
+  // Suspense user
+  static async suspenseUser(userId: string, adminId: string, note: string) {
+    const user = await User.findById(userId);
+    if (!user) throw ApiError.notFound('User not found');
+
+    user.status = 'suspended';
+    user.suspenseNote = note;
+    user.suspensedAt = new Date();
+    user.suspensedBy = new Types.ObjectId(adminId);
+    
+    await user.save();
+
+    await AuditService.log({
+      userId: adminId,
+      action: AuditAction.USER_UPDATED,
+      resource: 'User',
+      resourceId: userId,
+      metadata: { suspended: true, note },
+    });
+
+    return user;
+  }
+
+  // Restore / Un-suspend user
+  static async restoreUser(userId: string, adminId: string) {
+    const user = await User.findById(userId);
+    if (!user) throw ApiError.notFound('User not found');
+
+    user.isActive = true;
+    user.status = 'active';
+    user.suspenseNote = undefined;
+    user.suspensedAt = undefined;
+    user.suspensedBy = undefined;
+    
+    await user.save();
+
+    return user;
+  }
+
+  // Assign designation to a user
+  static async assignDesignation(userId: string, designationId: string | null, adminId: string) {
+    const user = await User.findById(userId);
+    if (!user) throw ApiError.notFound('User not found');
+
+    if (designationId) {
+      const { Designation } = await import('../designation/designation.model');
+      const designation = await Designation.findById(designationId);
+      if (!designation || !designation.isActive) throw ApiError.notFound('Designation not found');
+    }
+
+    user.designationId = designationId ? new Types.ObjectId(designationId) : null;
+    await user.save();
+
+    await AuditService.log({
+      userId: adminId,
+      action: AuditAction.USER_UPDATED,
+      resource: 'User',
+      resourceId: userId,
+      metadata: { designationAssigned: designationId, byAdmin: true },
+    });
+
+    return User.findById(userId).populate('designationId', 'name permissions');
   }
 
   // Get dashboard statistics
@@ -538,28 +651,6 @@ export class AdminService {
     });
 
     return organization;
-  }
-
-  // Archive user (soft delete)
-  static async archiveUser(userId: string, adminId: string): Promise<IUserDocument> {
-    const user = await User.findById(userId);
-    if (!user) {
-      throw ApiError.notFound('User not found');
-    }
-
-    user.isActive = false;
-    await user.save();
-
-    // Audit log
-    await AuditService.log({
-      userId: adminId,
-      action: AuditAction.USER_DELETED, // Reusing existing action for soft delete
-      resource: 'User',
-      resourceId: userId,
-      metadata: { archived: true, byAdmin: true },
-    });
-
-    return user;
   }
 
   // Archive subscription
