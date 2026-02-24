@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AdminRoleService } from './admin-role.service';
-import { sendSuccess } from '../../utils/response';
+import { sendSuccess, sendPaginated } from '../../utils/response';
 import { HttpStatus } from '../../utils/api-error';
 
 export class AdminRoleController {
@@ -14,7 +14,14 @@ export class AdminRoleController {
         search: search as string,
         includeInactive: includeInactive === 'true',
       });
-      sendSuccess(res, result, 'Roles fetched');
+      sendPaginated(
+        res,
+        result.data,
+        result.pagination.total,
+        result.pagination.page,
+        result.pagination.limit,
+        'Roles fetched'
+      );
     } catch (err) {
       next(err);
     }
