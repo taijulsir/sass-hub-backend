@@ -171,6 +171,21 @@ export class AdminController {
     }
   }
 
+  // Cancel invitation
+  static async cancelInvitation(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { invitationId } = req.params;
+      await AdminService.cancelInvitation(invitationId, req.user!.userId);
+      sendSuccess(res, null, 'Invitation cancelled successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Archive user
   static async archiveUser(
     req: AuthenticatedRequest,

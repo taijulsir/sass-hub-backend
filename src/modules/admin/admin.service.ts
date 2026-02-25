@@ -479,6 +479,28 @@ export class AdminService {
     return { success: true, message: 'Invitation resent successfully' };
   }
 
+  // Cancel (delete) a pending invitation
+  static async cancelInvitation(invitationId: string, adminId: string) {
+    const invitation = await Invitation.findById(invitationId);
+    if (!invitation) throw ApiError.notFound('Invitation not found');
+    if (invitation.status !== InvitationStatus.PENDING) {
+      throw ApiError.badRequest('Only pending invitations can be cancelled');
+    }
+
+    invitation.status = InvitationStatus.CANCELLED;
+    await invitation.save();
+
+    await AuditService.log({
+      userId: adminId,
+      action: AuditAction.INVITATION_CANCELLED,
+      resource: 'Invitation',
+      resourceId: invitation._id.toString(),
+      metadata: { invitedEmail: invitation.email, byAdmin: true },
+    });
+
+    return { success: true, message: 'Invitation cancelled' };
+  }
+
   // Archive user (Instead of hard delete)
   static async archiveUser(userId: string, adminId: string) {
     const user = await User.findById(userId);

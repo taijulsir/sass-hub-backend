@@ -40,6 +40,7 @@ router.get('/users/check-email', checkPlatformPermission(PLATFORM_PERMISSIONS.AD
 router.post('/users', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_INVITE), AdminController.createUser);
 router.post('/users/invite', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_INVITE), AdminController.inviteUser);
 router.post('/users/:invitationId/resend-invite', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_INVITE), AdminController.resendInvite);
+router.delete('/users/:invitationId/cancel-invite', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_INVITE), AdminController.cancelInvitation);
 router.patch('/users/:userId', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_EDIT), AdminController.updateUser);
 router.patch('/users/:userId/archive', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_SUSPEND), AdminController.archiveUser);
 router.patch('/users/:userId/unarchive', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_SUSPEND), AdminController.unarchiveUser);
