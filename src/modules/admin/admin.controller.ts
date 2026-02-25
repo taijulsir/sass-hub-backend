@@ -202,7 +202,7 @@ export class AdminController {
     }
   }
 
-  // Restore user
+  // Restore user (un-suspend)
   static async restoreUser(
     req: AuthenticatedRequest,
     res: Response,
@@ -212,6 +212,21 @@ export class AdminController {
       const { userId } = req.params;
       await AdminService.restoreUser(userId, req.user!.userId);
       sendSuccess(res, null, 'User restored successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Unarchive user (re-activate)
+  static async unarchiveUser(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { userId } = req.params;
+      await AdminService.unarchiveUser(userId, req.user!.userId);
+      sendSuccess(res, null, 'User unarchived successfully');
     } catch (error) {
       next(error);
     }

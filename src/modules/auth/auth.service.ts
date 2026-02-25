@@ -125,6 +125,16 @@ export class AuthService {
       throw ApiError.unauthorized('Wrong password');
     }
 
+    // Block suspended users from logging in
+    if (user.status === 'suspended') {
+      throw ApiError.forbidden('Your account has been suspended. Please contact support.');
+    }
+
+    // Block archived (inactive) users from logging in
+    if (!user.isActive) {
+      throw ApiError.forbidden('Your account has been deactivated. Please contact support.');
+    }
+
     // Generate tokens
     const tokens = generateTokenPair(
       user._id.toString(),
@@ -167,6 +177,14 @@ export class AuthService {
       const user = await User.findById(payload.userId).select('+refreshToken');
       if (!user || !user.refreshToken) {
         throw ApiError.unauthorized('Invalid refresh token');
+      }
+
+      // Block suspended/archived users from refreshing
+      if (user.status === 'suspended') {
+        throw ApiError.forbidden('Your account has been suspended.');
+      }
+      if (!user.isActive) {
+        throw ApiError.forbidden('Your account has been deactivated.');
       }
 
       // Verify stored refresh token

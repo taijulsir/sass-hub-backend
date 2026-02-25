@@ -306,15 +306,38 @@ export class AdminService {
     const total = await User.countDocuments(filter);
 
     const users = await User.find(filter)
+      .populate('suspensedBy', 'name email')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
+    // Enrich each user with their platform roles
+    const { UserPlatformRole } = await import('../platform-rbac/user-platform-role.model');
+    const userIds = users.map((u) => u._id);
+    const userRoles = await UserPlatformRole.find({ userId: { $in: userIds }, isActive: true })
+      .populate<{ roleId: { _id: string; name: string } }>('roleId', '_id name')
+      .lean();
+
+    // Build a map: userId → roles[]
+    const rolesMap: Record<string, Array<{ _id: string; name: string }>> = {};
+    for (const ur of userRoles) {
+      const uid = ur.userId.toString();
+      if (!rolesMap[uid]) rolesMap[uid] = [];
+      if (ur.roleId && typeof ur.roleId === 'object') {
+        rolesMap[uid].push({ _id: (ur.roleId as any)._id.toString(), name: (ur.roleId as any).name });
+      }
+    }
+
+    const enrichedUsers = users.map((u) => ({
+      ...u,
+      roles: rolesMap[(u._id as any).toString()] || [],
+    }));
+
     const totalPages = Math.ceil(total / limit);
 
     const result: PaginatedResponse<any> = {
-      data: users,
+      data: enrichedUsers,
       pagination: {
         total,
         page,
@@ -460,9 +483,18 @@ export class AdminService {
   static async archiveUser(userId: string, adminId: string) {
     const user = await User.findById(userId);
     if (!user) throw ApiError.notFound('User not found');
+    if (user.globalRole === GlobalRole.SUPER_ADMIN) {
+      throw ApiError.forbidden('Cannot archive a Super Admin');
+    }
 
     user.isActive = false;
+    // Invalidate refresh token so any active session is force-logged out
+    user.refreshToken = undefined as any;
     await user.save();
+
+    // Also deactivate all platform roles for this user
+    const { UserPlatformRole } = await import('../platform-rbac/user-platform-role.model');
+    await UserPlatformRole.updateMany({ userId }, { isActive: false });
 
     await AuditService.log({
       userId: adminId,
@@ -475,15 +507,44 @@ export class AdminService {
     return user;
   }
 
+  // Unarchive user
+  static async unarchiveUser(userId: string, adminId: string) {
+    const user = await User.findById(userId);
+    if (!user) throw ApiError.notFound('User not found');
+
+    user.isActive = true;
+    user.status = 'active';
+    await user.save();
+
+    // Re-activate all platform roles for this user
+    const { UserPlatformRole } = await import('../platform-rbac/user-platform-role.model');
+    await UserPlatformRole.updateMany({ userId }, { isActive: true });
+
+    await AuditService.log({
+      userId: adminId,
+      action: AuditAction.USER_UPDATED,
+      resource: 'User',
+      resourceId: userId,
+      metadata: { unarchived: true },
+    });
+
+    return user;
+  }
+
   // Suspense user
   static async suspenseUser(userId: string, adminId: string, note: string) {
     const user = await User.findById(userId);
     if (!user) throw ApiError.notFound('User not found');
+    if (user.globalRole === GlobalRole.SUPER_ADMIN) {
+      throw ApiError.forbidden('Cannot suspend a Super Admin');
+    }
 
     user.status = 'suspended';
     user.suspenseNote = note;
     user.suspensedAt = new Date();
     user.suspensedBy = new Types.ObjectId(adminId);
+    // Invalidate refresh token so active session is force-logged out
+    user.refreshToken = undefined as any;
     
     await user.save();
 

@@ -42,6 +42,7 @@ router.post('/users/invite', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_
 router.post('/users/:invitationId/resend-invite', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_INVITE), AdminController.resendInvite);
 router.patch('/users/:userId', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_EDIT), AdminController.updateUser);
 router.patch('/users/:userId/archive', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_SUSPEND), AdminController.archiveUser);
+router.patch('/users/:userId/unarchive', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_SUSPEND), AdminController.unarchiveUser);
 router.patch('/users/:userId/suspense', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_SUSPEND), AdminController.suspenseUser);
 router.patch('/users/:userId/restore', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_EDIT), AdminController.restoreUser);
 router.delete('/users/:userId', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_SUSPEND), AdminController.archiveUser);
