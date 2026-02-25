@@ -59,6 +59,13 @@ export class AdminRoleService {
       permissions: data.permissions || [],
     });
 
+    // Sync: create a matching PlatformRole so the RBAC engine can assign users
+    await PlatformRole.findOneAndUpdate(
+      { name: data.name },
+      { name: data.name, description: data.description || '', isSystem: false },
+      { upsert: true, new: true }
+    );
+
     return role;
   }
 
@@ -69,6 +76,8 @@ export class AdminRoleService {
   ) {
     const role = await AdminRole.findById(id);
     if (!role) throw ApiError.notFound('Role not found');
+
+    const oldName = role.name;
 
     if (data.name && data.name !== role.name) {
       const conflict = await AdminRole.findOne({
@@ -83,6 +92,15 @@ export class AdminRoleService {
     if (data.permissions !== undefined) role.permissions = data.permissions as any;
 
     await role.save();
+
+    // Sync: update the matching PlatformRole (name and/or description)
+    const updateFields: Record<string, unknown> = {};
+    if (data.name && data.name !== oldName) updateFields.name = data.name;
+    if (data.description !== undefined) updateFields.description = data.description;
+    if (Object.keys(updateFields).length > 0) {
+      await PlatformRole.findOneAndUpdate({ name: oldName }, { $set: updateFields });
+    }
+
     return role;
   }
 
@@ -92,6 +110,14 @@ export class AdminRoleService {
     if (!role) throw ApiError.notFound('Role not found');
     role.isActive = false;
     await role.save();
+
+    // Sync: remove the matching PlatformRole and its user assignments
+    const platformRole = await PlatformRole.findOne({ name: role.name }).lean();
+    if (platformRole) {
+      await UserPlatformRole.deleteMany({ roleId: platformRole._id });
+      await PlatformRole.findByIdAndDelete(platformRole._id);
+    }
+
     return role;
   }
 
@@ -113,10 +139,11 @@ export class AdminRoleService {
     const role = await AdminRole.findById(id);
     if (!role) throw ApiError.notFound('Role not found');
 
-    // Find the matching PlatformRole by name and remove all user assignments
+    // Find the matching PlatformRole by name and remove all user assignments + the role itself
     const platformRole = await PlatformRole.findOne({ name: role.name }).lean();
     if (platformRole) {
       await UserPlatformRole.deleteMany({ roleId: platformRole._id });
+      await PlatformRole.findByIdAndDelete(platformRole._id);
     }
 
     role.isActive = false;

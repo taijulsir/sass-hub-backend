@@ -3,7 +3,7 @@ import { SubscriptionController } from './subscription.controller';
 import { authenticate } from '../../middlewares/auth.middleware';
 import { loadMembership, requirePermission, requireOwner } from '../../middlewares/rbac.middleware';
 import { validateBody } from '../../middlewares/validate.middleware';
-import { updateSubscriptionDto, cancelSubscriptionDto } from './subscription.dto';
+import { changeSubscriptionPlanDto, cancelSubscriptionDto } from './subscription.dto';
 import { Permission } from '../../types/enums';
 
 const router = Router();
@@ -32,7 +32,7 @@ router.patch(
   '/:organizationId/plan',
   loadMembership,
   requireOwner,
-  validateBody(updateSubscriptionDto),
+  validateBody(changeSubscriptionPlanDto),
   SubscriptionController.changePlan
 );
 

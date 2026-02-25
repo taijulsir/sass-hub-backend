@@ -108,14 +108,57 @@ export const RolePermissions: Record<OrgRole, Permission[]> = {
 export enum OrgStatus {
   ACTIVE = 'ACTIVE',
   SUSPENDED = 'SUSPENDED',
+  ARCHIVED = 'ARCHIVED',
   PENDING = 'PENDING',
 }
 
-// Subscription plans
+// Subscription plans (used as plan.name identifiers)
 export enum Plan {
   FREE = 'FREE',
+  STARTER = 'STARTER',
   PRO = 'PRO',
   ENTERPRISE = 'ENTERPRISE',
+}
+
+// Subscription status
+export enum SubscriptionStatus {
+  TRIAL = 'TRIAL',
+  ACTIVE = 'ACTIVE',
+  PAST_DUE = 'PAST_DUE',
+  CANCELED = 'CANCELED',
+  EXPIRED = 'EXPIRED',
+}
+
+// Billing cycle
+export enum BillingCycle {
+  MONTHLY = 'MONTHLY',
+  YEARLY = 'YEARLY',
+}
+
+// Payment provider
+export enum PaymentProvider {
+  STRIPE = 'STRIPE',
+  SSLCOMMERZ = 'SSLCOMMERZ',
+  MANUAL = 'MANUAL',
+  NONE = 'NONE',
+}
+
+// Subscription creator type
+export enum SubscriptionCreatedBy {
+  ADMIN = 'ADMIN',
+  SELF_SERVICE = 'SELF_SERVICE',
+}
+
+// Subscription change type (for history)
+export enum SubscriptionChangeType {
+  UPGRADE = 'UPGRADE',
+  DOWNGRADE = 'DOWNGRADE',
+  CANCEL = 'CANCEL',
+  RENEWAL = 'RENEWAL',
+  TRIAL_START = 'TRIAL_START',
+  TRIAL_EXTEND = 'TRIAL_EXTEND',
+  REACTIVATION = 'REACTIVATION',
+  MANUAL_OVERRIDE = 'MANUAL_OVERRIDE',
 }
 
 // Invitation status
@@ -186,7 +229,15 @@ export enum AuditAction {
   SUBSCRIPTION_UPGRADED = 'SUBSCRIPTION_UPGRADED',
   SUBSCRIPTION_DOWNGRADED = 'SUBSCRIPTION_DOWNGRADED',
   SUBSCRIPTION_CANCELLED = 'SUBSCRIPTION_CANCELLED',
+  SUBSCRIPTION_REACTIVATED = 'SUBSCRIPTION_REACTIVATED',
+  SUBSCRIPTION_EXPIRED = 'SUBSCRIPTION_EXPIRED',
+  TRIAL_STARTED = 'TRIAL_STARTED',
+  TRIAL_EXTENDED = 'TRIAL_EXTENDED',
   PLAN_CHANGED = 'PLAN_CHANGED',
+
+  // Organization extended actions
+  ORG_ARCHIVED = 'ORG_ARCHIVED',
+  ORG_OWNERSHIP_TRANSFERRED = 'ORG_OWNERSHIP_TRANSFERRED',
 
   // Platform RBAC actions
   ADMIN_ROLE_ASSIGNED = 'ADMIN_ROLE_ASSIGNED',

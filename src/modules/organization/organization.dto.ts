@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { OrgStatus, Plan } from '../../types/enums';
+import { OrgStatus } from '../../types/enums';
 
 // Create organization DTO
 export const createOrganizationDto = z.object({
@@ -47,9 +47,9 @@ export const changeOrgStatusDto = z.object({
 
 export type ChangeOrgStatusDto = z.infer<typeof changeOrgStatusDto>;
 
-// Change organization plan DTO (admin only)
+// Change organization plan DTO (admin only — delegates to subscription)
 export const changeOrgPlanDto = z.object({
-  plan: z.nativeEnum(Plan),
+  planId: z.string().min(1, 'Plan ID is required'),
   reason: z.string().max(500).optional(),
 });
 

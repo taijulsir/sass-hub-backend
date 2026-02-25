@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { OrgStatus, Plan } from '../../types/enums';
+import { OrgStatus, BillingCycle } from '../../types/enums';
 
 // Admin change organization status DTO
 export const adminChangeOrgStatusDto = z.object({
@@ -11,31 +11,67 @@ export type AdminChangeOrgStatusDto = z.infer<typeof adminChangeOrgStatusDto>;
 
 // Admin change organization plan DTO
 export const adminChangeOrgPlanDto = z.object({
-  plan: z.nativeEnum(Plan),
+  planId: z.string().min(1, 'Plan ID is required'),
   reason: z.string().max(500).optional(),
 });
 
 export type AdminChangeOrgPlanDto = z.infer<typeof adminChangeOrgPlanDto>;
 
-// Create plan DTO
-export const createPlanDto = z.object({
-  name: z.string().min(2).max(50),
-  price: z.number().min(0),
-  billingCycle: z.enum(['monthly', 'yearly']),
-  features: z.array(z.string()),
-  limits: z.object({
-    maxMembers: z.number().min(1),
-    maxLeads: z.number().min(1),
-    maxStorage: z.number().min(1),
-  }),
+// Admin create organization DTO
+export const adminCreateOrganizationDto = z.object({
+  name: z
+    .string()
+    .min(2, 'Name must be at least 2 characters')
+    .max(100, 'Name must be less than 100 characters')
+    .trim(),
+  description: z.string().max(500).optional(),
+  logo: z.string().optional(),
+  ownerEmail: z.string().email().optional(),
+  ownerName: z.string().max(100).optional(),
+  planId: z.string().optional(),
+  billingCycle: z.nativeEnum(BillingCycle).optional(),
+  isTrial: z.boolean().optional().default(false),
+  trialDays: z.number().min(1).max(365).optional(),
+  notes: z.string().max(1000).optional(),
+  marketingTag: z.string().max(100).optional(),
 });
 
-export type CreatePlanDto = z.infer<typeof createPlanDto>;
+export type AdminCreateOrganizationDto = z.infer<typeof adminCreateOrganizationDto>;
+
+// Admin extend trial DTO
+export const adminExtendTrialDto = z.object({
+  additionalDays: z.number().min(1).max(365),
+  reason: z.string().max(500).optional(),
+});
+
+export type AdminExtendTrialDto = z.infer<typeof adminExtendTrialDto>;
+
+// Admin reactivate subscription DTO
+export const adminReactivateSubscriptionDto = z.object({
+  planId: z.string().min(1, 'Plan ID is required'),
+  billingCycle: z.nativeEnum(BillingCycle).optional(),
+});
+
+export type AdminReactivateSubscriptionDto = z.infer<typeof adminReactivateSubscriptionDto>;
+
+// Admin cancel subscription DTO
+export const adminCancelSubscriptionDto = z.object({
+  reason: z.string().max(500).optional(),
+});
+
+export type AdminCancelSubscriptionDto = z.infer<typeof adminCancelSubscriptionDto>;
+
+// Admin transfer ownership DTO
+export const adminTransferOwnershipDto = z.object({
+  newOwnerId: z.string().min(1, 'New owner ID is required'),
+});
+
+export type AdminTransferOwnershipDto = z.infer<typeof adminTransferOwnershipDto>;
 
 // Admin query DTO
 export const adminQueryDto = z.object({
   status: z.nativeEnum(OrgStatus).optional(),
-  plan: z.nativeEnum(Plan).optional(),
+  planId: z.string().optional(),
   search: z.string().optional(),
   page: z.string().regex(/^\d+$/).transform(Number).optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),

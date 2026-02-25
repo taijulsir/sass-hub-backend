@@ -2,7 +2,14 @@ import { Router } from 'express';
 import { AdminController } from './admin.controller';
 import { authenticate } from '../../middlewares/auth.middleware';
 import { validateBody } from '../../middlewares/validate.middleware';
-import { adminChangeOrgStatusDto, adminChangeOrgPlanDto, createPlanDto } from './admin.dto';
+import {
+  adminChangeOrgStatusDto,
+  adminChangeOrgPlanDto,
+  adminCreateOrganizationDto,
+  adminExtendTrialDto,
+  adminReactivateSubscriptionDto,
+  adminCancelSubscriptionDto,
+} from './admin.dto';
 import { checkPlatformPermission } from '../platform-rbac/platform-rbac.middleware';
 import { PLATFORM_PERMISSIONS } from '../../constants/platform-permissions';
 import designationRoutes from '../admin-role/admin-role.routes';
@@ -17,7 +24,12 @@ router.get('/dashboard', checkPlatformPermission(PLATFORM_PERMISSIONS.ORG_VIEW),
 
 // ── Organizations ──────────────────────────────────────────────────────────
 router.get('/organizations', checkPlatformPermission(PLATFORM_PERMISSIONS.ORG_VIEW), AdminController.getOrganizations);
-router.post('/organizations', checkPlatformPermission(PLATFORM_PERMISSIONS.ORG_CREATE), AdminController.createOrganization);
+router.post(
+  '/organizations',
+  checkPlatformPermission(PLATFORM_PERMISSIONS.ORG_CREATE),
+  validateBody(adminCreateOrganizationDto),
+  AdminController.createOrganization
+);
 router.get('/organizations/:organizationId', checkPlatformPermission(PLATFORM_PERMISSIONS.ORG_VIEW), AdminController.getOrganizationDetails);
 router.patch(
   '/organizations/:organizationId/status',
@@ -33,6 +45,31 @@ router.patch(
 );
 router.patch('/organizations/:organizationId', checkPlatformPermission(PLATFORM_PERMISSIONS.ORG_EDIT), AdminController.updateOrganization);
 router.delete('/organizations/:organizationId', checkPlatformPermission(PLATFORM_PERMISSIONS.ORG_DELETE), AdminController.archiveOrganization);
+
+// ── Subscription Management (per organization) ────────────────────────────
+router.get(
+  '/organizations/:organizationId/subscription',
+  checkPlatformPermission(PLATFORM_PERMISSIONS.ORG_VIEW),
+  AdminController.getSubscriptionHistory
+);
+router.post(
+  '/organizations/:organizationId/subscription/extend-trial',
+  checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_CHANGE),
+  validateBody(adminExtendTrialDto),
+  AdminController.extendTrial
+);
+router.post(
+  '/organizations/:organizationId/subscription/reactivate',
+  checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_CHANGE),
+  validateBody(adminReactivateSubscriptionDto),
+  AdminController.reactivateSubscription
+);
+router.post(
+  '/organizations/:organizationId/subscription/cancel',
+  checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_CHANGE),
+  validateBody(adminCancelSubscriptionDto),
+  AdminController.cancelSubscription
+);
 
 // ── Admin Users ────────────────────────────────────────────────────────────
 router.get('/users', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_VIEW), AdminController.getUsers);
@@ -51,7 +88,7 @@ router.delete('/users/:userId', checkPlatformPermission(PLATFORM_PERMISSIONS.ADM
 
 // ── Plans ──────────────────────────────────────────────────────────────────
 router.get('/plans', checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_VIEW), AdminController.getPlans);
-router.post('/plans', checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_CREATE), validateBody(createPlanDto), AdminController.createPlan);
+router.post('/plans', checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_CREATE), AdminController.createPlan);
 
 // ── Admin Roles (platform-level) ───────────────────────────────────────────
 router.use('/roles', checkPlatformPermission(PLATFORM_PERMISSIONS.DESIGNATION_VIEW), designationRoutes);

@@ -3,7 +3,7 @@ import { AdminService } from './admin.service';
 import { AuthenticatedRequest } from '../../types/interfaces';
 import { sendSuccess, sendPaginated } from '../../utils/response';
 import { HttpStatus } from '../../utils/api-error';
-import { OrgStatus, Plan } from '../../types/enums';
+import { OrgStatus } from '../../types/enums';
 
 export class AdminController {
   // Get dashboard statistics
@@ -27,11 +27,10 @@ export class AdminController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { status, plan, search, page, limit, isActive } = req.query as Record<string, string>;
+      const { status, search, page, limit, isActive } = req.query as Record<string, string>;
 
       const result = await AdminService.getOrganizations({
         status: status as OrgStatus,
-        plan: plan as Plan,
         search,
         page: page ? parseInt(page) : undefined,
         limit: limit ? parseInt(limit) : undefined,
@@ -98,16 +97,16 @@ export class AdminController {
   ): Promise<void> {
     try {
       const { organizationId } = req.params;
-      const { plan, reason } = req.body;
+      const { planId, reason } = req.body;
 
-      const organization = await AdminService.changeOrgPlan(
+      const subscription = await AdminService.changeOrgPlan(
         organizationId,
-        plan,
+        planId,
         req.user!.userId,
         reason
       );
 
-      sendSuccess(res, { organization }, 'Organization plan updated');
+      sendSuccess(res, { subscription }, 'Organization plan updated');
     } catch (error) {
       next(error);
     }
@@ -451,6 +450,92 @@ export class AdminController {
       );
 
       sendSuccess(res, { user }, 'User updated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ── Subscription Management ──────────────────────────────────────────────
+
+  // Extend trial for an organization's subscription
+  static async extendTrial(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { organizationId } = req.params;
+      const { additionalDays, reason } = req.body;
+
+      const subscription = await AdminService.extendTrial(
+        organizationId,
+        additionalDays,
+        req.user!.userId,
+        reason
+      );
+
+      sendSuccess(res, { subscription }, 'Trial extended successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Reactivate a canceled subscription
+  static async reactivateSubscription(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { organizationId } = req.params;
+      const { planId, billingCycle } = req.body;
+
+      const subscription = await AdminService.reactivateSubscription(
+        organizationId,
+        planId,
+        billingCycle,
+        req.user!.userId
+      );
+
+      sendSuccess(res, { subscription }, 'Subscription reactivated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Cancel an organization's subscription
+  static async cancelSubscription(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { organizationId } = req.params;
+      const { reason } = req.body;
+
+      const subscription = await AdminService.cancelSubscription(
+        organizationId,
+        req.user!.userId,
+        reason
+      );
+
+      sendSuccess(res, { subscription }, 'Subscription cancelled successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Get subscription history for an organization
+  static async getSubscriptionHistory(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { organizationId } = req.params;
+      const details = await AdminService.getSubscriptionDetails(organizationId);
+
+      sendSuccess(res, details);
     } catch (error) {
       next(error);
     }

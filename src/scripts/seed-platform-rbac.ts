@@ -26,6 +26,7 @@ import { PlatformRole } from '../modules/platform-rbac/platform-role.model';
 import { PlatformRolePermission } from '../modules/platform-rbac/platform-role-permission.model';
 import { UserPlatformRole } from '../modules/platform-rbac/user-platform-role.model';
 import { User } from '../modules/user/user.model';
+import { AdminRole } from '../modules/admin-role/admin-role.model';
 
 // ── Role → Permission mapping ─────────────────────────────────────────────
 
@@ -139,6 +140,20 @@ async function seed(): Promise<void> {
   }
 
   logger.info('Platform RBAC seed complete ✅');
+
+  // ── 5. Backfill: ensure all active AdminRoles have matching PlatformRoles ──
+  const adminRoles = await AdminRole.find({ isActive: true }).lean();
+  let backfilled = 0;
+  for (const ar of adminRoles) {
+    const result = await PlatformRole.findOneAndUpdate(
+      { name: ar.name },
+      { name: ar.name, description: ar.description || '', isSystem: false },
+      { upsert: true, new: true }
+    );
+    if (result) backfilled++;
+  }
+  logger.info(`✓ AdminRole → PlatformRole backfill: ${backfilled} roles synced`);
+
   await mongoose.disconnect();
 }
 

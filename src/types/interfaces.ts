@@ -106,13 +106,13 @@ export interface IUser {
 // Organization document interface
 export interface IOrganization {
   _id: Types.ObjectId;
+  organizationId: string;      // Public unique ID (e.g. org_8F4K2L9X)
   name: string;
   slug: string;
   description?: string;
   logo?: string;
   ownerId: Types.ObjectId;
-  plan: string;
-  status: string;
+  status: string;              // OrgStatus enum
   settings?: Record<string, unknown>;
   isActive: boolean;
   createdAt: Date;
@@ -153,11 +153,20 @@ export interface IInvitation {
 export interface ISubscription {
   _id: Types.ObjectId;
   organizationId: Types.ObjectId;
-  currentPlan: string;
+  planId: Types.ObjectId;           // References Plan document
+  status: string;                    // SubscriptionStatus enum
+  billingCycle: string;              // BillingCycle enum
   startDate: Date;
   endDate?: Date;
-  isActive: boolean;
+  renewalDate?: Date;
+  trialEndDate?: Date;
+  isTrial: boolean;
+  paymentProvider: string;           // PaymentProvider enum
+  paymentReferenceId?: string;       // Stripe session ID, SSLCommerz txn ID, etc.
+  createdBy: string;                 // SubscriptionCreatedBy enum
   cancelledAt?: Date;
+  cancelReason?: string;
+  isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -165,12 +174,14 @@ export interface ISubscription {
 // Subscription history document interface
 export interface ISubscriptionHistory {
   _id: Types.ObjectId;
+  subscriptionId: Types.ObjectId;
   organizationId: Types.ObjectId;
-  oldPlan: string;
-  newPlan: string;
+  previousPlanId?: Types.ObjectId;
+  newPlanId?: Types.ObjectId;
+  changeType: string;               // SubscriptionChangeType enum
   changedBy: Types.ObjectId;
   reason?: string;
-  changedAt: Date;
+  metadata?: Record<string, unknown>;
   createdAt: Date;
 }
 
@@ -226,17 +237,22 @@ export interface IAuditLog {
 // Plan document interface
 export interface IPlan {
   _id: Types.ObjectId;
-  name: string;
+  name: string;                 // FREE, STARTER, PRO, ENTERPRISE
   slug: string;
-  price: number;
-  billingCycle: 'monthly' | 'yearly';
-  features: string[];
+  description?: string;
+  price: number;                // Base monthly price
+  yearlyPrice?: number;         // Discounted yearly price
+  billingCycle: string;         // Default billing cycle
+  features: string[];           // Array of feature descriptions
   limits: {
     maxMembers: number;
     maxLeads: number;
-    maxStorage: number;
+    maxStorage: number;         // in MB
   };
+  trialDays: number;            // Default trial period for this plan
+  sortOrder: number;            // Display ordering (0=FREE, 1=STARTER, 2=PRO, 3=ENTERPRISE)
   isActive: boolean;
+  isPublic: boolean;            // Show on landing page pricing
   createdAt: Date;
   updatedAt: Date;
 }

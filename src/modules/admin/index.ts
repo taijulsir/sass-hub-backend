@@ -1,4 +1,3 @@
-export * from './plan.model';
 export * from './admin.dto';
 export * from './admin.service';
 export * from './admin.controller';

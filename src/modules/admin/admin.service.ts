@@ -4,13 +4,23 @@ import { Invitation } from '../invitation/invitation.model';
 import { Subscription } from '../subscription/subscription.model';
 import { SubscriptionHistory } from '../subscription/subscription-history.model';
 import { Membership } from '../membership/membership.model';
-import { Plan as PlanModel, IPlanDocument } from './plan.model';
+import { Plan as PlanModel, IPlanDocument } from '../plan/plan.model';
+import { SubscriptionService } from '../subscription/subscription.service';
 import { ApiError } from '../../utils/api-error';
-import { OrgStatus, Plan, AuditAction, GlobalRole, OrgRole, InvitationStatus } from '../../types/enums';
+import {
+  OrgStatus,
+  AuditAction,
+  GlobalRole,
+  OrgRole,
+  InvitationStatus,
+  SubscriptionCreatedBy,
+  PaymentProvider,
+  BillingCycle,
+  SubscriptionStatus,
+} from '../../types/enums';
 import { PaginatedResponse } from '../../types/interfaces';
 import { parsePagination } from '../../utils/response';
 import { AuditService } from '../audit/audit.service';
-import { CreatePlanDto } from './admin.dto';
 import { generateInvitationToken } from '../../utils/jwt';
 import { MailService } from '../mail/mail.service';
 import { env } from '../../config/env';
@@ -19,7 +29,7 @@ import { Types } from 'mongoose';
 
 export interface AdminOrgQueryParams {
   status?: OrgStatus;
-  plan?: Plan;
+  planId?: string;
   search?: string;
   page?: number;
   limit?: number;
@@ -45,31 +55,69 @@ export class AdminService {
       filter.status = params.status;
     }
 
-    if (params.plan) {
-      filter.plan = params.plan;
-    }
-
     if (params.search) {
       filter.$or = [
         { name: { $regex: params.search, $options: 'i' } },
         { slug: { $regex: params.search, $options: 'i' } },
+        { organizationId: { $regex: params.search, $options: 'i' } },
       ];
+    }
+
+    // If filtering by planId, first find orgs with matching subscriptions
+    if (params.planId) {
+      const matchingSubscriptions = await Subscription.find({
+        planId: params.planId,
+        isActive: true,
+      }).select('organizationId').lean();
+      const orgIds = matchingSubscriptions.map(s => s.organizationId);
+      filter._id = { $in: orgIds };
     }
 
     // Get total count
     const total = await Organization.countDocuments(filter);
 
-    // Get organizations
+    // Get organizations with owner populated
     const organizations = await Organization.find(filter)
       .populate('ownerId', 'name email')
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
+
+    // Enrich each org with its active subscription + plan
+    const orgIds = organizations.map(o => o._id);
+    const subscriptions = await Subscription.find({
+      organizationId: { $in: orgIds },
+      isActive: true,
+    })
+      .populate('planId', 'name price billingCycle')
+      .lean();
+
+    const subMap: Record<string, any> = {};
+    for (const sub of subscriptions) {
+      subMap[sub.organizationId.toString()] = sub;
+    }
+
+    // Enrich with member counts
+    const memberCounts = await Membership.aggregate([
+      { $match: { organizationId: { $in: orgIds } } },
+      { $group: { _id: '$organizationId', count: { $sum: 1 } } },
+    ]);
+    const memberCountMap: Record<string, number> = {};
+    for (const mc of memberCounts) {
+      memberCountMap[mc._id.toString()] = mc.count;
+    }
+
+    const enrichedOrgs = organizations.map(org => ({
+      ...org,
+      subscription: subMap[(org._id as any).toString()] || null,
+      memberCount: memberCountMap[(org._id as any).toString()] || 0,
+    }));
 
     const totalPages = Math.ceil(total / limit);
 
-    const result: PaginatedResponse<IOrganizationDocument> = {
-      data: organizations,
+    return {
+      data: enrichedOrgs as any,
       pagination: {
         total,
         page,
@@ -79,8 +127,6 @@ export class AdminService {
         hasPrev: page > 1,
       },
     };
-    
-    return result;
   }
 
   // Get organization by ID with details
@@ -92,13 +138,26 @@ export class AdminService {
       throw ApiError.notFound('Organization not found');
     }
 
-    const subscription = await Subscription.findOne({ organizationId });
+    const subscription = await Subscription.findOne({
+      organizationId,
+      isActive: true,
+    }).populate('planId').lean();
+
     const memberCount = await Membership.countDocuments({ organizationId });
+
+    const subscriptionHistory = await SubscriptionHistory.find({ organizationId })
+      .populate('previousPlanId', 'name price')
+      .populate('newPlanId', 'name price')
+      .populate('changedBy', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
 
     return {
       organization,
       subscription,
       memberCount,
+      subscriptionHistory,
     };
   }
 
@@ -138,7 +197,7 @@ export class AdminService {
   // Change organization plan (admin override)
   static async changeOrgPlan(
     organizationId: string,
-    newPlan: Plan,
+    newPlanId: string,
     adminId: string,
     reason?: string
   ): Promise<IOrganizationDocument> {
@@ -147,54 +206,39 @@ export class AdminService {
       throw ApiError.notFound('Organization not found');
     }
 
-    const subscription = await Subscription.findOne({ organizationId });
-    if (!subscription) {
-      throw ApiError.notFound('Subscription not found');
-    }
-
-    const oldPlan = organization.plan;
-
-    // Create history record
-    await SubscriptionHistory.create({
+    // Delegate to subscription service
+    await SubscriptionService.changePlan({
       organizationId,
-      oldPlan,
-      newPlan,
+      newPlanId,
       changedBy: adminId,
       reason: reason || 'Admin override',
-      changedAt: new Date(),
-    });
-
-    // Update subscription
-    subscription.currentPlan = newPlan;
-    await subscription.save();
-
-    // Update organization
-    organization.plan = newPlan;
-    await organization.save();
-
-    // Audit log
-    await AuditService.log({
-      organizationId,
-      userId: adminId,
-      action: AuditAction.PLAN_CHANGED,
-      resource: 'Subscription',
-      metadata: { oldPlan, newPlan, reason, byAdmin: true },
     });
 
     return organization;
   }
 
-  // Create organization
+  // Create organization (Admin flow with full subscription support)
   static async createOrganization(data: any, adminId: string): Promise<IOrganizationDocument> {
     const slug = data.name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '');
     
-    // Check if we need to invite an owner
-    const { ownerEmail, ownerName, ...orgData } = data;
-    
+    const { ownerEmail, ownerName, planId, billingCycle, isTrial, trialDays, ...orgData } = data;
+
+    // Resolve plan — default to FREE
+    let resolvedPlanId = planId;
+    if (!resolvedPlanId) {
+      const freePlan = await PlanModel.findOne({ name: 'FREE', isActive: true });
+      if (freePlan) resolvedPlanId = freePlan._id.toString();
+      else throw ApiError.badRequest('No active FREE plan found. Please seed plans first.');
+    } else {
+      // Validate plan exists
+      const plan = await PlanModel.findById(resolvedPlanId);
+      if (!plan) throw ApiError.notFound('Plan not found');
+    }
+
     const organization = await Organization.create({
       ...orgData,
       slug,
-      ownerId: adminId, // Initially set to admin until they accept invite
+      ownerId: adminId, // Initially set to admin until owner accepts invite
       status: OrgStatus.ACTIVE,
       isActive: true,
       logo: data.logo || null,
@@ -202,22 +246,22 @@ export class AdminService {
 
     // Handle owner invitation if provided
     if (ownerEmail && ownerName) {
-      // Generate invite token for owner
       const token = generateInvitationToken(ownerEmail, organization._id.toString());
       const inviteLink = `${env.adminFrontendUrl}/register?token=${token}`;
-      
-      // Enqueue owner-invite email
       await MailService.sendOwnerInvite(ownerEmail, ownerName, organization.name, inviteLink);
-      
       logger.info(`Owner invitation queued for ${ownerEmail} for organization ${organization.name}`);
     }
 
-    // Create default subscription
-    await Subscription.create({
-      organizationId: organization._id,
-      plan: Plan.FREE,
-      status: 'active',
-      startDate: new Date(),
+    // Create subscription with plan
+    await SubscriptionService.create({
+      organizationId: organization._id.toString(),
+      planId: resolvedPlanId,
+      billingCycle: billingCycle || BillingCycle.MONTHLY,
+      isTrial: isTrial ?? false,
+      trialDays: trialDays,
+      paymentProvider: PaymentProvider.MANUAL,
+      createdBy: SubscriptionCreatedBy.ADMIN,
+      userId: adminId,
     });
 
     await AuditService.log({
@@ -226,7 +270,13 @@ export class AdminService {
       action: AuditAction.ORG_CREATED,
       resource: 'Organization',
       resourceId: organization._id.toString(),
-      metadata: { byAdmin: true },
+      metadata: {
+        byAdmin: true,
+        planId: resolvedPlanId,
+        isTrial,
+        trialDays,
+        organizationId: organization.organizationId,
+      },
     });
 
     return organization;
@@ -626,18 +676,30 @@ export class AdminService {
       activeOrganizations,
       suspendedOrganizations,
       totalUsers,
-      freeOrgs,
-      proOrgs,
-      enterpriseOrgs,
+      activeSubscriptions,
+      trialSubscriptions,
     ] = await Promise.all([
       Organization.countDocuments({ isActive: true }),
       Organization.countDocuments({ status: OrgStatus.ACTIVE, isActive: true }),
       Organization.countDocuments({ status: OrgStatus.SUSPENDED, isActive: true }),
       User.countDocuments({ isActive: true }),
-      Organization.countDocuments({ plan: Plan.FREE, isActive: true }),
-      Organization.countDocuments({ plan: Plan.PRO, isActive: true }),
-      Organization.countDocuments({ plan: Plan.ENTERPRISE, isActive: true }),
+      Subscription.countDocuments({ isActive: true, status: SubscriptionStatus.ACTIVE }),
+      Subscription.countDocuments({ isActive: true, status: SubscriptionStatus.TRIAL }),
     ]);
+
+    // Count subscriptions per plan
+    const planDistribution = await Subscription.aggregate([
+      { $match: { isActive: true } },
+      { $lookup: { from: 'plans', localField: 'planId', foreignField: '_id', as: 'plan' } },
+      { $unwind: '$plan' },
+      { $group: { _id: '$plan.name', count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const planCounts: Record<string, number> = {};
+    for (const p of planDistribution) {
+      planCounts[p._id] = p.count;
+    }
 
     return {
       organizations: {
@@ -649,16 +711,16 @@ export class AdminService {
         total: totalUsers,
       },
       subscriptions: {
-        free: freeOrgs,
-        pro: proOrgs,
-        enterprise: enterpriseOrgs,
+        active: activeSubscriptions,
+        trial: trialSubscriptions,
+        byPlan: planCounts,
       },
     };
   }
 
-  // Create plan
-  static async createPlan(dto: CreatePlanDto): Promise<IPlanDocument> {
-    const existingPlan = await PlanModel.findOne({ name: dto.name });
+  // Create plan (delegates to Plan module, kept here for backward compatibility)
+  static async createPlan(dto: any): Promise<IPlanDocument> {
+    const existingPlan = await PlanModel.findOne({ name: dto.name?.toUpperCase() });
     if (existingPlan) {
       throw ApiError.conflict('Plan with this name already exists');
     }
@@ -668,7 +730,7 @@ export class AdminService {
 
   // Get all plans
   static async getPlans(): Promise<IPlanDocument[]> {
-    return PlanModel.find({ isActive: true }).sort({ price: 1 });
+    return PlanModel.find({ isActive: true }).sort({ sortOrder: 1, price: 1 });
   }
 
   // Get users by global role
@@ -717,7 +779,7 @@ export class AdminService {
       { $sort: { _id: 1 } }
     ]);
 
-    // 3. Revenue simplified (from subscriptions)
+    // 3. Revenue simplified (from active subscriptions)
     const activeSubscriptions = await Subscription.countDocuments({ isActive: true });
 
     return {
@@ -768,31 +830,24 @@ export class AdminService {
     return organization;
   }
 
-  // Archive subscription
+  // Archive subscription (cancel via admin)
   static async archiveSubscription(subscriptionId: string, adminId: string): Promise<void> {
     const subscription = await Subscription.findById(subscriptionId);
     if (!subscription) {
       throw ApiError.notFound('Subscription not found');
     }
 
-    subscription.isActive = false;
-    await subscription.save();
-
-    // Audit log
-    await AuditService.log({
+    await SubscriptionService.cancel({
       organizationId: subscription.organizationId.toString(),
-      userId: adminId,
-      action: AuditAction.PLAN_CHANGED, // Or define a new one if needed
-      resource: 'Subscription',
-      resourceId: subscriptionId,
-      metadata: { archived: true, byAdmin: true },
+      cancelledBy: adminId,
+      reason: 'Archived by admin',
     });
   }
 
   // Update organization details
   static async updateOrganization(
     organizationId: string,
-    data: { name?: string; status?: OrgStatus; plan?: Plan; logo?: string },
+    data: { name?: string; status?: OrgStatus; logo?: string },
     adminId: string
   ): Promise<IOrganizationDocument> {
     const organization = await Organization.findById(organizationId);
@@ -802,7 +857,6 @@ export class AdminService {
 
     if (data.name) organization.name = data.name;
     if (data.status) organization.status = data.status;
-    if (data.plan) organization.plan = data.plan;
     if (data.logo) organization.logo = data.logo;
 
     await organization.save();
@@ -847,5 +901,121 @@ export class AdminService {
     });
 
     return user;
+  }
+
+  // ── Subscription admin actions ─────────────────────────────────────────
+
+  // Extend trial for an organization
+  static async extendTrial(
+    organizationId: string,
+    additionalDays: number,
+    adminId: string,
+    reason?: string
+  ) {
+    return SubscriptionService.extendTrial({
+      organizationId,
+      additionalDays,
+      extendedBy: adminId,
+      reason,
+    });
+  }
+
+  // Reactivate subscription for an organization
+  static async reactivateSubscription(
+    organizationId: string,
+    planId: string,
+    billingCycle: BillingCycle | undefined,
+    adminId: string
+  ) {
+    return SubscriptionService.reactivate({
+      organizationId,
+      planId,
+      billingCycle,
+      reactivatedBy: adminId,
+    });
+  }
+
+  // Cancel subscription for an organization
+  static async cancelSubscription(
+    organizationId: string,
+    adminId: string,
+    reason?: string
+  ) {
+    return SubscriptionService.cancel({
+      organizationId,
+      cancelledBy: adminId,
+      reason: reason || 'Cancelled by admin',
+    });
+  }
+
+  // Get subscription details for an organization
+  static async getSubscriptionDetails(organizationId: string) {
+    const subscription = await Subscription.findOne({
+      organizationId,
+      isActive: true,
+    }).populate('planId').lean();
+
+    const history = await SubscriptionHistory.find({ organizationId })
+      .populate('previousPlanId', 'name price')
+      .populate('newPlanId', 'name price')
+      .populate('changedBy', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    return { subscription, history };
+  }
+
+  // Transfer organization ownership
+  static async transferOwnership(
+    organizationId: string,
+    newOwnerId: string,
+    adminId: string
+  ) {
+    const organization = await Organization.findById(organizationId);
+    if (!organization) throw ApiError.notFound('Organization not found');
+
+    const newOwner = await User.findById(newOwnerId);
+    if (!newOwner) throw ApiError.notFound('New owner user not found');
+
+    const oldOwnerId = organization.ownerId;
+
+    // Ensure new owner has a membership, or create one
+    let membership = await Membership.findOne({ organizationId, userId: newOwnerId });
+    if (!membership) {
+      membership = await Membership.create({
+        userId: newOwnerId,
+        organizationId,
+        role: OrgRole.OWNER,
+      });
+    } else {
+      membership.role = OrgRole.OWNER;
+      await membership.save();
+    }
+
+    // Demote old owner to ADMIN
+    await Membership.findOneAndUpdate(
+      { organizationId, userId: oldOwnerId },
+      { role: OrgRole.ADMIN }
+    );
+
+    // Update organization
+    organization.ownerId = newOwnerId as any;
+    await organization.save();
+
+    await AuditService.log({
+      organizationId,
+      userId: adminId,
+      action: AuditAction.ORG_OWNERSHIP_TRANSFERRED,
+      resource: 'Organization',
+      resourceId: organizationId,
+      metadata: {
+        oldOwnerId: oldOwnerId.toString(),
+        newOwnerId,
+        byAdmin: true,
+      },
+    });
+
+    return organization;
   }
 }

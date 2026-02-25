@@ -1,25 +1,33 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { Plan } from '../../types/enums';
+import { SubscriptionChangeType } from '../../types/enums';
 import { ISubscriptionHistory } from '../../types/interfaces';
 
 export interface ISubscriptionHistoryDocument extends Omit<ISubscriptionHistory, '_id'>, Document {}
 
 const subscriptionHistorySchema = new Schema<ISubscriptionHistoryDocument>(
   {
+    subscriptionId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Subscription',
+      required: [true, 'Subscription is required'],
+    },
     organizationId: {
       type: Schema.Types.ObjectId,
       ref: 'Organization',
       required: [true, 'Organization is required'],
     },
-    oldPlan: {
-      type: String,
-      enum: Object.values(Plan),
-      required: [true, 'Old plan is required'],
+    previousPlanId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Plan',
     },
-    newPlan: {
+    newPlanId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Plan',
+    },
+    changeType: {
       type: String,
-      enum: Object.values(Plan),
-      required: [true, 'New plan is required'],
+      enum: Object.values(SubscriptionChangeType),
+      required: [true, 'Change type is required'],
     },
     changedBy: {
       type: Schema.Types.ObjectId,
@@ -30,13 +38,13 @@ const subscriptionHistorySchema = new Schema<ISubscriptionHistoryDocument>(
       type: String,
       maxlength: [500, 'Reason must be less than 500 characters'],
     },
-    changedAt: {
-      type: Date,
-      default: Date.now,
+    metadata: {
+      type: Schema.Types.Mixed,
+      default: {},
     },
   },
   {
-    timestamps: true,
+    timestamps: { createdAt: true, updatedAt: false },
     toJSON: {
       transform(_doc, ret: Record<string, unknown>) {
         delete ret.__v;
@@ -47,9 +55,11 @@ const subscriptionHistorySchema = new Schema<ISubscriptionHistoryDocument>(
 );
 
 // Indexes
+subscriptionHistorySchema.index({ subscriptionId: 1 });
 subscriptionHistorySchema.index({ organizationId: 1 });
-subscriptionHistorySchema.index({ changedAt: -1 });
+subscriptionHistorySchema.index({ createdAt: -1 });
 subscriptionHistorySchema.index({ changedBy: 1 });
+subscriptionHistorySchema.index({ changeType: 1 });
 
 export const SubscriptionHistory = mongoose.model<ISubscriptionHistoryDocument>(
   'SubscriptionHistory',

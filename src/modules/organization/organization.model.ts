@@ -1,11 +1,31 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { OrgStatus, Plan } from '../../types/enums';
+import { OrgStatus } from '../../types/enums';
 import { IOrganization } from '../../types/interfaces';
+import crypto from 'crypto';
 
 export interface IOrganizationDocument extends Omit<IOrganization, '_id'>, Document {}
 
+/**
+ * Generate a public organization ID like org_8F4K2L9X
+ */
+function generateOrgId(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Excludes I,O,0,1 for readability
+  let result = '';
+  const bytes = crypto.randomBytes(8);
+  for (let i = 0; i < 8; i++) {
+    result += chars[bytes[i] % chars.length];
+  }
+  return `org_${result}`;
+}
+
 const organizationSchema = new Schema<IOrganizationDocument>(
   {
+    organizationId: {
+      type: String,
+      required: true,
+      unique: true,
+      default: generateOrgId,
+    },
     name: {
       type: String,
       required: [true, 'Organization name is required'],
@@ -32,11 +52,6 @@ const organizationSchema = new Schema<IOrganizationDocument>(
       ref: 'User',
       required: [true, 'Owner is required'],
     },
-    plan: {
-      type: String,
-      enum: Object.values(Plan),
-      default: Plan.FREE,
-    },
     status: {
       type: String,
       enum: Object.values(OrgStatus),
@@ -62,10 +77,9 @@ const organizationSchema = new Schema<IOrganizationDocument>(
   }
 );
 
-// Indexes (slug already has unique: true in schema)
+// Indexes
 organizationSchema.index({ ownerId: 1 });
 organizationSchema.index({ status: 1 });
-organizationSchema.index({ plan: 1 });
 organizationSchema.index({ createdAt: -1 });
 
 // Generate slug from name

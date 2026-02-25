@@ -1,5 +1,10 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { Plan } from '../../types/enums';
+import {
+  SubscriptionStatus,
+  BillingCycle,
+  PaymentProvider,
+  SubscriptionCreatedBy,
+} from '../../types/enums';
 import { ISubscription } from '../../types/interfaces';
 
 export interface ISubscriptionDocument extends Omit<ISubscription, '_id'>, Document {}
@@ -10,12 +15,21 @@ const subscriptionSchema = new Schema<ISubscriptionDocument>(
       type: Schema.Types.ObjectId,
       ref: 'Organization',
       required: [true, 'Organization is required'],
-      unique: true,
     },
-    currentPlan: {
+    planId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Plan',
+      required: [true, 'Plan is required'],
+    },
+    status: {
       type: String,
-      enum: Object.values(Plan),
-      default: Plan.FREE,
+      enum: Object.values(SubscriptionStatus),
+      default: SubscriptionStatus.ACTIVE,
+    },
+    billingCycle: {
+      type: String,
+      enum: Object.values(BillingCycle),
+      default: BillingCycle.MONTHLY,
     },
     startDate: {
       type: Date,
@@ -24,12 +38,39 @@ const subscriptionSchema = new Schema<ISubscriptionDocument>(
     endDate: {
       type: Date,
     },
-    isActive: {
+    renewalDate: {
+      type: Date,
+    },
+    trialEndDate: {
+      type: Date,
+    },
+    isTrial: {
       type: Boolean,
-      default: true,
+      default: false,
+    },
+    paymentProvider: {
+      type: String,
+      enum: Object.values(PaymentProvider),
+      default: PaymentProvider.NONE,
+    },
+    paymentReferenceId: {
+      type: String,
+    },
+    createdBy: {
+      type: String,
+      enum: Object.values(SubscriptionCreatedBy),
+      default: SubscriptionCreatedBy.ADMIN,
     },
     cancelledAt: {
       type: Date,
+    },
+    cancelReason: {
+      type: String,
+      maxlength: [500, 'Cancel reason must be less than 500 characters'],
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
     },
   },
   {
@@ -43,9 +84,13 @@ const subscriptionSchema = new Schema<ISubscriptionDocument>(
   }
 );
 
-// Indexes (organizationId already has unique: true in schema)
-subscriptionSchema.index({ currentPlan: 1 });
-subscriptionSchema.index({ isActive: 1 });
+// Indexes — only ONE active subscription per organization at a time
+subscriptionSchema.index({ organizationId: 1, status: 1 });
+subscriptionSchema.index({ organizationId: 1, isActive: 1 });
+subscriptionSchema.index({ planId: 1 });
+subscriptionSchema.index({ status: 1 });
+subscriptionSchema.index({ renewalDate: 1 });
+subscriptionSchema.index({ trialEndDate: 1 });
 subscriptionSchema.index({ endDate: 1 });
 
 export const Subscription = mongoose.model<ISubscriptionDocument>('Subscription', subscriptionSchema);
