@@ -232,6 +232,21 @@ export class AdminController {
     }
   }
 
+  // Force logout — clears all active sessions for a user
+  static async forceLogout(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { userId } = req.params;
+      await AdminService.forceLogout(userId, req.user!.userId);
+      sendSuccess(res, null, 'User sessions invalidated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Unarchive user (re-activate)
   static async unarchiveUser(
     req: AuthenticatedRequest,

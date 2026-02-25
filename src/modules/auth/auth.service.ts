@@ -142,9 +142,11 @@ export class AuthService {
       user.globalRole
     );
 
-    // Store hashed refresh token
+    // Store hashed refresh token + track last login
     const hashedRefreshToken = await bcrypt.hash(tokens.refreshToken, 10);
     user.refreshToken = hashedRefreshToken;
+    user.lastLoginAt = new Date();
+    user.loginCount = (user.loginCount ?? 0) + 1;
     await user.save();
 
     // Load platform RBAC permissions for admin-panel users

@@ -46,6 +46,7 @@ router.patch('/users/:userId/archive', checkPlatformPermission(PLATFORM_PERMISSI
 router.patch('/users/:userId/unarchive', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_SUSPEND), AdminController.unarchiveUser);
 router.patch('/users/:userId/suspense', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_SUSPEND), AdminController.suspenseUser);
 router.patch('/users/:userId/restore', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_EDIT), AdminController.restoreUser);
+router.patch('/users/:userId/force-logout', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_SUSPEND), AdminController.forceLogout);
 router.delete('/users/:userId', checkPlatformPermission(PLATFORM_PERMISSIONS.ADMIN_SUSPEND), AdminController.archiveUser);
 
 // ── Plans ──────────────────────────────────────────────────────────────────

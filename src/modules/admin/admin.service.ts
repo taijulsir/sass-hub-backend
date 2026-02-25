@@ -597,6 +597,28 @@ export class AdminService {
     return user;
   }
 
+  // Force logout — clears the stored refresh token so all sessions are invalidated
+  static async forceLogout(userId: string, adminId: string) {
+    if (userId === adminId) {
+      throw ApiError.badRequest('You cannot force-logout yourself');
+    }
+    const user = await User.findById(userId).select('+refreshToken');
+    if (!user) throw ApiError.notFound('User not found');
+
+    user.refreshToken = undefined;
+    await user.save();
+
+    await AuditService.log({
+      userId: adminId,
+      action: AuditAction.USER_UPDATED,
+      resource: 'User',
+      resourceId: userId,
+      metadata: { action: 'force_logout', byAdmin: true },
+    });
+
+    return { success: true };
+  }
+
   // Get dashboard statistics
   static async getDashboardStats() {
     const [

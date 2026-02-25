@@ -95,6 +95,10 @@ export interface IUser {
   suspensedAt?: Date;
   suspensedBy?: Types.ObjectId;
 
+  // Activity tracking
+  lastLoginAt?: Date;
+  loginCount?: number;
+
   createdAt: Date;
   updatedAt: Date;
 }

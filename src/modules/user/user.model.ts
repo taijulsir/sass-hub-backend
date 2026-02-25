@@ -78,6 +78,13 @@ const userSchema = new Schema<IUserDocument>(
       type: Schema.Types.ObjectId,
       ref: 'User',
     },
+    lastLoginAt: {
+      type: Date,
+    },
+    loginCount: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
