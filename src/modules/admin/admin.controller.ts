@@ -396,6 +396,25 @@ export class AdminController {
     }
   }
 
+  // Permanently delete organization
+  static async permanentlyDeleteOrganization(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { organizationId } = req.params;
+      await AdminService.permanentlyDeleteOrganization(
+        organizationId,
+        req.user!.userId
+      );
+
+      sendSuccess(res, null, 'Organization permanently deleted');
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Archive subscription
   static async archiveSubscription(
     req: AuthenticatedRequest,

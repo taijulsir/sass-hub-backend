@@ -830,6 +830,52 @@ export class AdminService {
     return organization;
   }
 
+  // Permanently delete organization and all related data
+  static async permanentlyDeleteOrganization(organizationId: string, adminId: string): Promise<void> {
+    const organization = await Organization.findById(organizationId);
+    if (!organization) {
+      throw ApiError.notFound('Organization not found');
+    }
+
+    const orgId = organization._id;
+
+    // Delete related data in parallel
+    await Promise.all([
+      Subscription.deleteMany({ organizationId: orgId }),
+      SubscriptionHistory.deleteMany({ organizationId: orgId }),
+      Membership.deleteMany({ organizationId: orgId }),
+      Invitation.deleteMany({ organizationId: orgId }),
+    ]);
+
+    // Dynamic imports for models not already imported at top level
+    const { Role } = await import('../role/role.model');
+    const { AuditLog } = await import('../audit/audit-log.model');
+
+    await Promise.all([
+      Role.deleteMany({ organizationId: orgId }),
+      AuditLog.deleteMany({ organizationId: orgId }),
+    ]);
+
+    // Delete the organization itself
+    await Organization.findByIdAndDelete(orgId);
+
+    // Log the permanent deletion (at platform level, no orgId)
+    await AuditService.log({
+      userId: adminId,
+      action: AuditAction.ORG_DELETED,
+      resource: 'Organization',
+      resourceId: organizationId,
+      metadata: {
+        permanentDelete: true,
+        organizationName: organization.name,
+        organizationSlug: organization.slug,
+        byAdmin: true,
+      },
+    });
+
+    logger.info(`Organization ${organization.name} (${organizationId}) permanently deleted by admin ${adminId}`);
+  }
+
   // Archive subscription (cancel via admin)
   static async archiveSubscription(subscriptionId: string, adminId: string): Promise<void> {
     const subscription = await Subscription.findById(subscriptionId);

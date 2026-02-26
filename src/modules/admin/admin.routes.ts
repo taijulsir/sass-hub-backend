@@ -45,6 +45,7 @@ router.patch(
 );
 router.patch('/organizations/:organizationId', checkPlatformPermission(PLATFORM_PERMISSIONS.ORG_EDIT), AdminController.updateOrganization);
 router.delete('/organizations/:organizationId', checkPlatformPermission(PLATFORM_PERMISSIONS.ORG_DELETE), AdminController.archiveOrganization);
+router.delete('/organizations/:organizationId/permanent', checkPlatformPermission(PLATFORM_PERMISSIONS.ORG_DELETE), AdminController.permanentlyDeleteOrganization);
 
 // ── Subscription Management (per organization) ────────────────────────────
 router.get(
