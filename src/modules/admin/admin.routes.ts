@@ -100,6 +100,13 @@ router.get('/audit-logs', checkPlatformPermission(PLATFORM_PERMISSIONS.AUDIT_VIE
 
 // ── Analytics ─────────────────────────────────────────────────────────────
 router.get('/analytics', checkPlatformPermission(PLATFORM_PERMISSIONS.ANALYTICS_VIEW), AdminController.getAnalytics);
+router.get('/analytics/overview', checkPlatformPermission(PLATFORM_PERMISSIONS.ANALYTICS_VIEW), AdminController.getAnalyticsOverview);
+router.get('/analytics/revenue-trend', checkPlatformPermission(PLATFORM_PERMISSIONS.ANALYTICS_VIEW), AdminController.getRevenueTrend);
+router.get('/analytics/revenue-by-plan', checkPlatformPermission(PLATFORM_PERMISSIONS.ANALYTICS_VIEW), AdminController.getRevenueByPlan);
+router.get('/analytics/subscription-stats', checkPlatformPermission(PLATFORM_PERMISSIONS.ANALYTICS_VIEW), AdminController.getSubscriptionStats);
+router.get('/analytics/user-growth', checkPlatformPermission(PLATFORM_PERMISSIONS.ANALYTICS_VIEW), AdminController.getUserGrowth);
+router.get('/analytics/org-growth', checkPlatformPermission(PLATFORM_PERMISSIONS.ANALYTICS_VIEW), AdminController.getOrgGrowth);
+router.get('/analytics/churn', checkPlatformPermission(PLATFORM_PERMISSIONS.ANALYTICS_VIEW), AdminController.getChurnAnalysis);
 
 // ── Settings ───────────────────────────────────────────────────────────────
 router.get('/settings', AdminController.getSettings);

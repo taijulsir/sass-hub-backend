@@ -1,5 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { AdminService } from './admin.service';
+import { AnalyticsService } from './analytics.service';
 import { AuthenticatedRequest } from '../../types/interfaces';
 import { sendSuccess, sendPaginated } from '../../utils/response';
 import { HttpStatus } from '../../utils/api-error';
@@ -361,7 +362,7 @@ export class AdminController {
     }
   }
 
-  // Get analytics
+  // Get analytics (legacy — kept for backwards compat)
   static async getAnalytics(
     req: AuthenticatedRequest,
     res: Response,
@@ -374,6 +375,133 @@ export class AdminController {
         endDate: endDate ? new Date(endDate) : undefined,
       });
       sendSuccess(res, { analytics });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ── Analytics v2 ────────────────────────────────────────────────────────
+
+  static async getAnalyticsOverview(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { startDate, endDate } = req.query as Record<string, string>;
+      const data = await AnalyticsService.getOverview({
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined,
+      });
+      sendSuccess(res, data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getRevenueTrend(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { startDate, endDate } = req.query as Record<string, string>;
+      const data = await AnalyticsService.getRevenueTrend({
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined,
+      });
+      sendSuccess(res, data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getRevenueByPlan(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const data = await AnalyticsService.getRevenueByPlan();
+      sendSuccess(res, { plans: data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getSubscriptionStats(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { startDate, endDate } = req.query as Record<string, string>;
+      const [statusStats, newVsCanceled, planDistribution] = await Promise.all([
+        AnalyticsService.getSubscriptionStatusStats(),
+        AnalyticsService.getNewVsCanceled({
+          startDate: startDate ? new Date(startDate) : undefined,
+          endDate: endDate ? new Date(endDate) : undefined,
+        }),
+        AnalyticsService.getPlanDistribution(),
+      ]);
+      sendSuccess(res, { statusStats, newVsCanceled, planDistribution });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getUserGrowth(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { startDate, endDate } = req.query as Record<string, string>;
+      const [growth, roleDistribution] = await Promise.all([
+        AnalyticsService.getUserGrowth({
+          startDate: startDate ? new Date(startDate) : undefined,
+          endDate: endDate ? new Date(endDate) : undefined,
+        }),
+        AnalyticsService.getRoleDistribution(),
+      ]);
+      sendSuccess(res, { growth, roleDistribution });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getOrgGrowth(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { startDate, endDate } = req.query as Record<string, string>;
+      const [growth, topOrgs] = await Promise.all([
+        AnalyticsService.getOrgGrowth({
+          startDate: startDate ? new Date(startDate) : undefined,
+          endDate: endDate ? new Date(endDate) : undefined,
+        }),
+        AnalyticsService.getTopOrgsByRevenue(),
+      ]);
+      sendSuccess(res, { growth, topOrgs });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getChurnAnalysis(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { startDate, endDate } = req.query as Record<string, string>;
+      const data = await AnalyticsService.getChurnTrend({
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined,
+      });
+      sendSuccess(res, { churnTrend: data });
     } catch (error) {
       next(error);
     }
