@@ -282,8 +282,22 @@ export class AdminService {
     return organization;
   }
 
-  // Get all users
-  static async getUsers(params: { page?: number; limit?: number; search?: string; tab?: string }) {
+  // Get all users (with advanced composable filters)
+  static async getUsers(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    tab?: string;
+    // Advanced filters
+    roles?: string;          // comma-separated globalRole values
+    statuses?: string;       // comma-separated status values
+    emailVerified?: string;  // 'true' | 'false'
+    lastLogin?: string;      // 'never' | '24h' | '7d' | '30d' | 'custom'
+    lastLoginFrom?: string;  // ISO date
+    lastLoginTo?: string;    // ISO date
+    joinedFrom?: string;     // ISO date
+    joinedTo?: string;       // ISO date
+  }) {
     const { page, limit, skip } = parsePagination({
       page: params.page?.toString(),
       limit: params.limit?.toString(),
@@ -292,23 +306,18 @@ export class AdminService {
     const tab = params.tab || 'active';
 
     // ── Invited tab: query pending invitations instead of users ───────────
-    if (tab === 'invited') {
+    if (tab === 'invited' || (params.statuses && params.statuses.split(',').includes('invited') && params.statuses.split(',').length === 1)) {
       const inviteFilter: Record<string, unknown> = { status: InvitationStatus.PENDING };
-
       if (params.search) {
         inviteFilter.email = { $regex: params.search, $options: 'i' };
       }
-
       const total = await Invitation.countDocuments(inviteFilter);
       const invitations = await Invitation.find(inviteFilter)
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .populate('invitedBy', 'name email');
-
       const totalPages = Math.ceil(total / limit);
-
-      // Shape invitations to look like user rows for the frontend table
       const data = invitations.map((inv: any) => ({
         _id: inv._id,
         name: inv.name || '—',
@@ -321,40 +330,99 @@ export class AdminService {
         expiresAt: inv.expiresAt,
         _type: 'invitation',
       }));
-
-      const result: PaginatedResponse<any> = {
-        data,
-        pagination: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrev: page > 1 },
-      };
-      return result;
+      return { data, pagination: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrev: page > 1 } } as PaginatedResponse<any>;
     }
 
-    // ── User tabs ─────────────────────────────────────────────────────────
-    // Show all platform users (everyone except pure org MEMBER role)
+    // ── Platform user tabs with advanced filtering ────────────────────────
     const filter: Record<string, unknown> = {
       globalRole: { $in: [GlobalRole.SUPER_ADMIN, GlobalRole.ADMIN, GlobalRole.USER, GlobalRole.SUPPORT] },
     };
 
-    if (tab === 'archived' || tab === 'deactivated') {
-      filter.isActive = false;
-    } else if (tab === 'suspended') {
-      filter.isActive = true;
-      filter.status = 'suspended';
-    } else {
-      // Default: Active
-      filter.isActive = true;
-      filter.status = 'active';
+    // Tab-based defaults (overridden if advanced status filter is provided)
+    if (!params.statuses) {
+      if (tab === 'archived' || tab === 'deactivated') {
+        filter.isActive = false;
+      } else if (tab === 'suspended') {
+        filter.isActive = true;
+        filter.status = 'suspended';
+      } else {
+        filter.isActive = true;
+        filter.status = 'active';
+      }
     }
 
+    // ── Advanced: multi-status filter ────────────────────────────────────
+    if (params.statuses) {
+      const statusList = params.statuses.split(',').map((s) => s.trim()).filter(Boolean);
+      const orConditions: Record<string, unknown>[] = [];
+      for (const s of statusList) {
+        if (s === 'archived') orConditions.push({ isActive: false });
+        else if (s === 'suspended') orConditions.push({ isActive: true, status: 'suspended' });
+        else if (s === 'active') orConditions.push({ isActive: true, status: 'active' });
+      }
+      if (orConditions.length === 1) {
+        Object.assign(filter, orConditions[0]);
+      } else if (orConditions.length > 1) {
+        filter.$or = orConditions;
+      }
+    }
+
+    // ── Advanced: globalRole filter ───────────────────────────────────────
+    if (params.roles) {
+      const roleList = params.roles.split(',').map((r) => r.trim()).filter(Boolean);
+      if (roleList.length > 0) {
+        filter.globalRole = { $in: roleList };
+      }
+    }
+
+    // ── Advanced: email verification ──────────────────────────────────────
+    if (params.emailVerified === 'true') filter.isEmailVerified = true;
+    else if (params.emailVerified === 'false') filter.isEmailVerified = false;
+
+    // ── Advanced: last login ──────────────────────────────────────────────
+    if (params.lastLogin) {
+      const now = new Date();
+      if (params.lastLogin === 'never') {
+        filter.lastLoginAt = { $exists: false };
+      } else if (params.lastLogin === '24h') {
+        filter.lastLoginAt = { $gte: new Date(now.getTime() - 24 * 60 * 60 * 1000) };
+      } else if (params.lastLogin === '7d') {
+        filter.lastLoginAt = { $gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) };
+      } else if (params.lastLogin === '30d') {
+        filter.lastLoginAt = { $gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) };
+      } else if (params.lastLogin === 'custom') {
+        const range: Record<string, Date> = {};
+        if (params.lastLoginFrom) range.$gte = new Date(params.lastLoginFrom);
+        if (params.lastLoginTo) range.$lte = new Date(params.lastLoginTo + 'T23:59:59.999Z');
+        if (Object.keys(range).length) filter.lastLoginAt = range;
+      }
+    }
+
+    // ── Advanced: joined date range ───────────────────────────────────────
+    if (params.joinedFrom || params.joinedTo) {
+      const range: Record<string, Date> = {};
+      if (params.joinedFrom) range.$gte = new Date(params.joinedFrom);
+      if (params.joinedTo) range.$lte = new Date(params.joinedTo + 'T23:59:59.999Z');
+      filter.createdAt = range;
+    }
+
+    // ── Search ────────────────────────────────────────────────────────────
     if (params.search) {
-      filter.$or = [
+      const searchOr = [
         { name: { $regex: params.search, $options: 'i' } },
         { email: { $regex: params.search, $options: 'i' } },
       ];
+      // Merge with any existing $or from status filter
+      if (filter.$or) {
+        // Wrap both in $and
+        filter.$and = [{ $or: filter.$or }, { $or: searchOr }];
+        delete filter.$or;
+      } else {
+        filter.$or = searchOr;
+      }
     }
 
     const total = await User.countDocuments(filter);
-
     const users = await User.find(filter)
       .populate('suspensedBy', 'name email')
       .sort({ createdAt: -1 })
@@ -362,14 +430,12 @@ export class AdminService {
       .limit(limit)
       .lean();
 
-    // Enrich each user with their platform roles
+    // Enrich with platform roles
     const { UserPlatformRole } = await import('../platform-rbac/user-platform-role.model');
     const userIds = users.map((u) => u._id);
     const userRoles = await UserPlatformRole.find({ userId: { $in: userIds }, isActive: true })
       .populate<{ roleId: { _id: string; name: string } }>('roleId', '_id name')
       .lean();
-
-    // Build a map: userId → roles[]
     const rolesMap: Record<string, Array<{ _id: string; name: string }>> = {};
     for (const ur of userRoles) {
       const uid = ur.userId.toString();
@@ -385,20 +451,10 @@ export class AdminService {
     }));
 
     const totalPages = Math.ceil(total / limit);
-
-    const result: PaginatedResponse<any> = {
+    return {
       data: enrichedUsers,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNext: page < totalPages,
-        hasPrev: page > 1,
-      },
-    };
-
-    return result;
+      pagination: { total, page, limit, totalPages, hasNext: page < totalPages, hasPrev: page > 1 },
+    } as PaginatedResponse<any>;
   }
 
   // Check email availability

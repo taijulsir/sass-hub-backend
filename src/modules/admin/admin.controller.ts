@@ -133,13 +133,26 @@ export class AdminController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { search, page, limit, tab } = req.query as Record<string, string>;
+      const {
+        search, page, limit, tab,
+        roles, statuses, emailVerified,
+        lastLogin, lastLoginFrom, lastLoginTo,
+        joinedFrom, joinedTo,
+      } = req.query as Record<string, string>;
 
       const result = await AdminService.getUsers({
         search,
         page: page ? parseInt(page) : undefined,
         limit: limit ? parseInt(limit) : undefined,
         tab: tab || 'active',
+        roles,
+        statuses,
+        emailVerified,
+        lastLogin,
+        lastLoginFrom,
+        lastLoginTo,
+        joinedFrom,
+        joinedTo,
       });
 
       sendPaginated(
