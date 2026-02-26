@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { OrgStatus, BillingCycle } from '../../types/enums';
+import { OrgStatus, BillingCycle, SubscriptionStatus, PaymentProvider, SubscriptionCreatedBy } from '../../types/enums';
 
 // Admin change organization status DTO
 export const adminChangeOrgStatusDto = z.object({
@@ -78,3 +78,73 @@ export const adminQueryDto = z.object({
 });
 
 export type AdminQueryDto = z.infer<typeof adminQueryDto>;
+
+// ── Subscription routes by ID ──────────────────────────────────────────────
+
+export const adminSubscriptionFilterDto = z.object({
+  status: z.nativeEnum(SubscriptionStatus).optional(),
+  planId: z.string().optional(),
+  billingCycle: z.nativeEnum(BillingCycle).optional(),
+  paymentProvider: z.nativeEnum(PaymentProvider).optional(),
+  createdBy: z.nativeEnum(SubscriptionCreatedBy).optional(),
+  search: z.string().optional(),
+  trialEndingSoon: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true'),
+  renewalBefore: z
+    .string()
+    .optional()
+    .transform((v) => (v ? new Date(v) : undefined)),
+  renewalAfter: z
+    .string()
+    .optional()
+    .transform((v) => (v ? new Date(v) : undefined)),
+  page: z
+    .string()
+    .regex(/^\d+$/)
+    .transform(Number)
+    .optional(),
+  limit: z
+    .string()
+    .regex(/^\d+$/)
+    .transform(Number)
+    .optional(),
+});
+
+export type AdminSubscriptionFilterDto = z.infer<typeof adminSubscriptionFilterDto>;
+
+export const adminChangePlanByIdDto = z.object({
+  newPlanId: z.string().min(1, 'New plan ID is required'),
+  billingCycle: z.nativeEnum(BillingCycle).optional(),
+  reason: z.string().min(1, 'Reason is required').max(500),
+});
+
+export type AdminChangePlanByIdDto = z.infer<typeof adminChangePlanByIdDto>;
+
+export const adminExtendTrialByIdDto = z.object({
+  additionalDays: z.number().min(1).max(365),
+  reason: z.string().max(500).optional(),
+});
+
+export type AdminExtendTrialByIdDto = z.infer<typeof adminExtendTrialByIdDto>;
+
+export const adminCancelByIdDto = z.object({
+  reason: z.string().min(1, 'Reason is required').max(500),
+});
+
+export type AdminCancelByIdDto = z.infer<typeof adminCancelByIdDto>;
+
+export const adminReactivateByIdDto = z.object({
+  planId: z.string().min(1, 'Plan ID is required'),
+  billingCycle: z.nativeEnum(BillingCycle).optional(),
+  reason: z.string().max(500).optional(),
+});
+
+export type AdminReactivateByIdDto = z.infer<typeof adminReactivateByIdDto>;
+
+export const adminForceExpireDto = z.object({
+  reason: z.string().min(1, 'Reason is required').max(500),
+});
+
+export type AdminForceExpireDto = z.infer<typeof adminForceExpireDto>;

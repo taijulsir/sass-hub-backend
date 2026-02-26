@@ -9,6 +9,11 @@ import {
   adminExtendTrialDto,
   adminReactivateSubscriptionDto,
   adminCancelSubscriptionDto,
+  adminChangePlanByIdDto,
+  adminExtendTrialByIdDto,
+  adminCancelByIdDto,
+  adminReactivateByIdDto,
+  adminForceExpireDto,
 } from './admin.dto';
 import { checkPlatformPermission } from '../platform-rbac/platform-rbac.middleware';
 import { PLATFORM_PERMISSIONS } from '../../constants/platform-permissions';
@@ -111,5 +116,57 @@ router.get('/analytics/churn', checkPlatformPermission(PLATFORM_PERMISSIONS.ANAL
 // ── Settings ───────────────────────────────────────────────────────────────
 router.get('/settings', AdminController.getSettings);
 router.put('/settings', AdminController.updateSettings);
+
+// ── Subscriptions (direct, by subscription ID) ────────────────────────────
+router.get(
+  '/subscriptions/kpis',
+  checkPlatformPermission(PLATFORM_PERMISSIONS.SUBSCRIPTION_VIEW),
+  AdminController.getSubscriptionKpis
+);
+router.get(
+  '/subscriptions',
+  checkPlatformPermission(PLATFORM_PERMISSIONS.SUBSCRIPTION_VIEW),
+  AdminController.getAdminSubscriptions
+);
+router.get(
+  '/subscriptions/:subscriptionId',
+  checkPlatformPermission(PLATFORM_PERMISSIONS.SUBSCRIPTION_VIEW),
+  AdminController.getAdminSubscription
+);
+router.get(
+  '/subscriptions/:subscriptionId/history',
+  checkPlatformPermission(PLATFORM_PERMISSIONS.SUBSCRIPTION_VIEW),
+  AdminController.getAdminSubscriptionHistory
+);
+router.patch(
+  '/subscriptions/:subscriptionId/change-plan',
+  checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_CHANGE),
+  validateBody(adminChangePlanByIdDto),
+  AdminController.adminChangePlan
+);
+router.patch(
+  '/subscriptions/:subscriptionId/extend-trial',
+  checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_CHANGE),
+  validateBody(adminExtendTrialByIdDto),
+  AdminController.adminExtendTrial
+);
+router.patch(
+  '/subscriptions/:subscriptionId/cancel',
+  checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_CHANGE),
+  validateBody(adminCancelByIdDto),
+  AdminController.adminCancelSubscription
+);
+router.patch(
+  '/subscriptions/:subscriptionId/reactivate',
+  checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_CHANGE),
+  validateBody(adminReactivateByIdDto),
+  AdminController.adminReactivateSubscription
+);
+router.patch(
+  '/subscriptions/:subscriptionId/force-expire',
+  checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_CHANGE),
+  validateBody(adminForceExpireDto),
+  AdminController.adminForceExpire
+);
 
 export default router;

@@ -1,10 +1,11 @@
 import { Response, NextFunction } from 'express';
 import { AdminService } from './admin.service';
 import { AnalyticsService } from './analytics.service';
+import { AdminSubscriptionService } from './admin-subscription.service';
 import { AuthenticatedRequest } from '../../types/interfaces';
 import { sendSuccess, sendPaginated } from '../../utils/response';
 import { HttpStatus } from '../../utils/api-error';
-import { OrgStatus } from '../../types/enums';
+import { OrgStatus, SubscriptionStatus, BillingCycle, PaymentProvider, SubscriptionCreatedBy } from '../../types/enums';
 
 export class AdminController {
   // Get dashboard statistics
@@ -741,6 +742,189 @@ export class AdminController {
     try {
       const result = await AdminService.resendInvite(req.params.invitationId, req.user!.userId);
       sendSuccess(res, result, 'Invitation resent successfully', HttpStatus.OK);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ── Admin Subscriptions (direct subscription ID routes) ─────────────────
+
+  // GET /admin/subscriptions
+  static async getAdminSubscriptions(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const {
+        status, planId, billingCycle, paymentProvider, createdBy,
+        search, trialEndingSoon, renewalBefore, renewalAfter, page, limit,
+      } = req.query as Record<string, string>;
+
+      const result = await AdminSubscriptionService.listAll({
+        status: status as SubscriptionStatus,
+        planId,
+        billingCycle: billingCycle as BillingCycle,
+        paymentProvider: paymentProvider as PaymentProvider,
+        createdBy: createdBy as SubscriptionCreatedBy,
+        search,
+        trialEndingSoon: trialEndingSoon === 'true',
+        renewalBefore: renewalBefore ? new Date(renewalBefore) : undefined,
+        renewalAfter: renewalAfter ? new Date(renewalAfter) : undefined,
+        page: page ? parseInt(page) : undefined,
+        limit: limit ? parseInt(limit) : undefined,
+      });
+
+      sendPaginated(
+        res,
+        result.data,
+        result.pagination.total,
+        result.pagination.page,
+        result.pagination.limit,
+        'Subscriptions fetched successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // GET /admin/subscriptions/kpis
+  static async getSubscriptionKpis(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const kpis = await AdminSubscriptionService.getKpiCounts();
+      sendSuccess(res, { kpis });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // GET /admin/subscriptions/:subscriptionId
+  static async getAdminSubscription(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const subscription = await AdminSubscriptionService.getById(req.params.subscriptionId);
+      sendSuccess(res, { subscription });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // GET /admin/subscriptions/:subscriptionId/history
+  static async getAdminSubscriptionHistory(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const history = await AdminSubscriptionService.getHistory(req.params.subscriptionId);
+      sendSuccess(res, { history });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // PATCH /admin/subscriptions/:subscriptionId/change-plan
+  static async adminChangePlan(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { newPlanId, billingCycle, reason } = req.body;
+      const subscription = await AdminSubscriptionService.changePlan({
+        subscriptionId: req.params.subscriptionId,
+        newPlanId,
+        billingCycle,
+        reason,
+        adminId: req.user!.userId,
+      });
+      sendSuccess(res, { subscription }, 'Plan changed successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // PATCH /admin/subscriptions/:subscriptionId/extend-trial
+  static async adminExtendTrial(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { additionalDays, reason } = req.body;
+      const subscription = await AdminSubscriptionService.extendTrial({
+        subscriptionId: req.params.subscriptionId,
+        additionalDays,
+        reason,
+        adminId: req.user!.userId,
+      });
+      sendSuccess(res, { subscription }, 'Trial extended successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // PATCH /admin/subscriptions/:subscriptionId/cancel
+  static async adminCancelSubscription(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { reason } = req.body;
+      const subscription = await AdminSubscriptionService.cancel({
+        subscriptionId: req.params.subscriptionId,
+        reason,
+        adminId: req.user!.userId,
+      });
+      sendSuccess(res, { subscription }, 'Subscription cancelled successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // PATCH /admin/subscriptions/:subscriptionId/reactivate
+  static async adminReactivateSubscription(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { planId, billingCycle, reason } = req.body;
+      const subscription = await AdminSubscriptionService.reactivate({
+        subscriptionId: req.params.subscriptionId,
+        planId,
+        billingCycle,
+        reason,
+        adminId: req.user!.userId,
+      });
+      sendSuccess(res, { subscription }, 'Subscription reactivated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // PATCH /admin/subscriptions/:subscriptionId/force-expire
+  static async adminForceExpire(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { reason } = req.body;
+      const subscription = await AdminSubscriptionService.forceExpire({
+        subscriptionId: req.params.subscriptionId,
+        reason,
+        adminId: req.user!.userId,
+      });
+      sendSuccess(res, { subscription }, 'Subscription force-expired');
     } catch (error) {
       next(error);
     }
