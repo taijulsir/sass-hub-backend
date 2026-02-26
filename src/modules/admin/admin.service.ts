@@ -728,6 +728,75 @@ export class AdminService {
     return PlanModel.create(dto);
   }
 
+  // Seed default plans (FREE, STARTER, PRO, ENTERPRISE)
+  static async seedPlans(): Promise<{ created: string[]; skipped: string[] }> {
+    const defaults = [
+      {
+        name: 'FREE',
+        description: 'Perfect for individuals getting started.',
+        price: 0,
+        yearlyPrice: 0,
+        billingCycle: BillingCycle.MONTHLY,
+        trialDays: 0,
+        sortOrder: 0,
+        isPublic: true,
+        limits: { maxMembers: 3, maxLeads: 50, maxStorage: 512 },
+        features: ['3 members', '50 leads', '512 MB storage', 'Basic support'],
+      },
+      {
+        name: 'STARTER',
+        description: 'Great for small teams starting to grow.',
+        price: 29,
+        yearlyPrice: 290,
+        billingCycle: BillingCycle.MONTHLY,
+        trialDays: 14,
+        sortOrder: 1,
+        isPublic: true,
+        limits: { maxMembers: 10, maxLeads: 500, maxStorage: 5120 },
+        features: ['10 members', '500 leads', '5 GB storage', 'Email support', '14-day trial'],
+      },
+      {
+        name: 'PRO',
+        description: 'For growing businesses that need more power.',
+        price: 79,
+        yearlyPrice: 790,
+        billingCycle: BillingCycle.MONTHLY,
+        trialDays: 14,
+        sortOrder: 2,
+        isPublic: true,
+        limits: { maxMembers: 50, maxLeads: 5000, maxStorage: 51200 },
+        features: ['50 members', '5,000 leads', '50 GB storage', 'Priority support', 'Analytics', '14-day trial'],
+      },
+      {
+        name: 'ENTERPRISE',
+        description: 'Custom solutions for large organizations.',
+        price: 199,
+        yearlyPrice: 1990,
+        billingCycle: BillingCycle.MONTHLY,
+        trialDays: 30,
+        sortOrder: 3,
+        isPublic: true,
+        limits: { maxMembers: 500, maxLeads: 100000, maxStorage: 512000 },
+        features: ['500 members', '100,000 leads', '500 GB storage', 'Dedicated support', 'Custom integrations', 'SLA', '30-day trial'],
+      },
+    ];
+
+    const created: string[] = [];
+    const skipped: string[] = [];
+
+    for (const plan of defaults) {
+      const exists = await PlanModel.findOne({ name: plan.name });
+      if (exists) {
+        skipped.push(plan.name);
+      } else {
+        await PlanModel.create(plan);
+        created.push(plan.name);
+      }
+    }
+
+    return { created, skipped };
+  }
+
   // Get all plans
   static async getPlans(): Promise<IPlanDocument[]> {
     return PlanModel.find({ isActive: true }).sort({ sortOrder: 1, price: 1 });

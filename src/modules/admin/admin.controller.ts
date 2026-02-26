@@ -303,6 +303,23 @@ export class AdminController {
     }
   }
 
+  // Seed default plans
+  static async seedPlans(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const result = await AdminService.seedPlans();
+      const message = result.created.length > 0
+        ? `Seeded: ${result.created.join(', ')}${result.skipped.length ? `. Skipped (already exist): ${result.skipped.join(', ')}` : ''}`
+        : `All plans already exist: ${result.skipped.join(', ')}`;
+      sendSuccess(res, result, message, HttpStatus.CREATED);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Get audit logs
   static async getAuditLogs(
     req: AuthenticatedRequest,

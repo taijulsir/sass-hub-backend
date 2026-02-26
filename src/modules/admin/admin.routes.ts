@@ -89,6 +89,7 @@ router.delete('/users/:userId', checkPlatformPermission(PLATFORM_PERMISSIONS.ADM
 
 // ── Plans ──────────────────────────────────────────────────────────────────
 router.get('/plans', checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_VIEW), AdminController.getPlans);
+router.post('/plans/seed', checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_CREATE), AdminController.seedPlans);
 router.post('/plans', checkPlatformPermission(PLATFORM_PERMISSIONS.PLAN_CREATE), AdminController.createPlan);
 
 // ── Admin Roles (platform-level) ───────────────────────────────────────────
